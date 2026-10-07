@@ -1005,7 +1005,7 @@ ${body}
     runCommand(command);
   }
 
-  $("[data-command]").forEach((button) => {
+  $$("[data-command]").forEach((button) => {
     button.addEventListener("mousedown", (event) => {
       const focused = document.activeElement;
 
