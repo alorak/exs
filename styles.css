@@ -240,6 +240,44 @@ select:focus-visible,
   font-size: 17px;
 }
 
+.fraction-tool {
+  width: 38px;
+  padding: 0;
+}
+
+.fraction-tool-icon {
+  width: 25px;
+  height: 25px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.fraction-template-button {
+  display: grid;
+  place-items: center;
+}
+
+.fraction-template-icon {
+  width: 24px;
+  display: inline-grid;
+  grid-template-rows: auto 1px auto;
+  align-items: center;
+  justify-items: center;
+  line-height: 1;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 12px;
+}
+
+.fraction-template-icon i {
+  width: 22px;
+  height: 1px;
+  background: currentColor;
+}
+
 .export-menu { position: relative; }
 
 .header-export .popover {
@@ -484,10 +522,18 @@ select:focus-visible,
   font-family: "Times New Roman", Times, serif;
 }
 
+math-field {
+  /* Keep MathLive selection/highlight states subtle so formulas read like native text. */
+  --selection-background-color: #e6edf4;
+  --contains-highlight-background-color: #f2f5f8;
+  --caret-color: #315d86;
+  --smart-fence-color: #5f7790;
+}
+
 math-field:focus {
-  outline: 1px solid #8eb8e3;
+  outline: 1px solid #c7d6e4;
   border-radius: 3px;
-  background: #fbfdff;
+  background: #fff;
 }
 
 /* EXS uses its own math toolbar; MathLive's on-screen keyboard is intentionally disabled. */

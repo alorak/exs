@@ -81,7 +81,13 @@
       <button class="math-tool" data-latex="\displaystyle\sum_{\placeholder{i=1}}^{\placeholder{n}}\placeholder{x_i}" title="Toplam">∑</button>
       <button class="math-tool" data-latex="\displaystyle\prod_{\placeholder{i=1}}^{\placeholder{n}}\placeholder{x_i}" title="Çarpım">∏</button>
       <button class="math-tool" data-latex="\displaystyle\int_{\placeholder{a}}^{\placeholder{b}}\placeholder{f(x)}\,d\placeholder{x}" title="İntegral">∫</button>
-      <button class="math-tool math-tool-wide" data-latex="\displaystyle\frac{\placeholder{a}}{\placeholder{b}}" title="Kesir">½</button>
+      <button class="math-tool fraction-tool" data-latex="\displaystyle\frac{\placeholder{a}}{\placeholder{b}}" title="Kesir" aria-label="Kesir ekle">
+        <svg class="fraction-tool-icon" viewBox="0 0 28 28" aria-hidden="true">
+          <rect x="9" y="3.5" width="10" height="6" rx="1.2"/>
+          <path d="M5 14h18"/>
+          <rect x="9" y="18.5" width="10" height="6" rx="1.2"/>
+        </svg>
+      </button>
       <button class="math-tool" data-latex="\sqrt{\placeholder{x}}" title="Karekök">√</button>
       <button class="math-tool math-tool-wide" data-latex="\lim_{\placeholder{x}\to\placeholder{a}}\placeholder{f(x)}" title="Limit">lim</button>
       <button class="math-tool" data-latex="\left(\placeholder{x}\right)" title="Parantez">( )</button>
@@ -135,7 +141,9 @@
       <section class="tool-section">
         <h3>Matematik yapıları</h3>
         <div class="template-grid">
-          <button data-latex="\frac{\placeholder{a}}{\placeholder{b}}">a/b</button>
+          <button class="fraction-template-button" data-latex="\frac{\placeholder{a}}{\placeholder{b}}" title="Kesir" aria-label="Kesir ekle">
+            <span class="fraction-template-icon" aria-hidden="true"><span>a</span><i></i><span>b</span></span>
+          </button>
           <button data-latex="\sqrt{\placeholder{x}}">√x</button>
           <button data-latex="\placeholder{x}^{\placeholder{n}}">xⁿ</button>
           <button data-latex="\sum_{i=1}^{n}\placeholder{x_i}">Σ</button>
