@@ -45,6 +45,7 @@
   let contextMenuMathField = null;
   let contextMenuRange = null;
   let tableResizeState = null;
+  let fontSizeMathTarget = null;
 
   const greekSymbols = [
     ["α", "\\alpha"], ["β", "\\beta"], ["γ", "\\gamma"], ["δ", "\\delta"],
@@ -771,11 +772,14 @@
     });
   }
 
-  function applyFontSize(size) {
+  function applyFontSize(size, explicitMathTarget = null) {
     const numericSize = Number(size);
     if (!Number.isFinite(numericSize)) return;
 
-    const mathTarget = getMathTarget();
+    const mathTarget =
+      explicitMathTarget && explicitMathTarget.isConnected
+        ? explicitMathTarget
+        : getMathTarget();
     if (mathTarget && editor.contains(mathTarget)) {
       mathTarget.dataset.fontSize = String(numericSize);
       mathTarget.style.fontSize = `${numericSize}pt`;
@@ -1838,10 +1842,22 @@ ${body}
   editor.addEventListener("keyup", saveSelection);
   editor.addEventListener("mouseup", saveSelection);
   editor.addEventListener("focusout", saveSelection);
+  editor.addEventListener("pointermove", updateTableResizeCursor);
+
+  editor.addEventListener("pointerleave", () => {
+    if (!tableResizeState) clearTableResizeCursor();
+  });
+
   editor.addEventListener("pointerdown", (event) => {
+    if (beginTableResize(event)) return;
+
     const target = event.target instanceof Element ? event.target : null;
     if (!target?.closest("math-field")) clearMathContext();
   });
+
+  document.addEventListener("pointermove", continueTableResize);
+  document.addEventListener("pointerup", finishTableResize);
+  document.addEventListener("pointercancel", finishTableResize);
 
   editor.addEventListener("contextmenu", (event) => {
     const target = event.target instanceof Element ? event.target : null;
@@ -1986,7 +2002,27 @@ ${body}
     runCommand("formatBlock", event.target.value);
   });
 
-  $$("[data-menu-action]").forEach((button) => {
+  $("#fontSizeSelect").addEventListener("pointerdown", () => {
+    const focused = document.activeElement;
+    if (
+      focused &&
+      focused.tagName === "MATH-FIELD" &&
+      editor.contains(focused)
+    ) {
+      fontSizeMathTarget = focused;
+      rememberMathContext(focused);
+    } else {
+      fontSizeMathTarget = null;
+      saveSelection();
+    }
+  });
+
+  $("#fontSizeSelect").addEventListener("change", (event) => {
+    applyFontSize(event.target.value, fontSizeMathTarget);
+    fontSizeMathTarget = null;
+  });
+
+  $("[data-menu-action]").forEach((button) => {
     button.addEventListener("mousedown", (event) => {
       const mathTarget = getMathTarget();
       if (mathTarget) rememberMathContext(mathTarget);
