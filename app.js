@@ -231,10 +231,24 @@
     activeMathPosition = null;
   }
 
+  function selectionIsInTextEditor() {
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return false;
+
+    const range = selection.getRangeAt(0);
+    const node = range.commonAncestorContainer;
+    if (!editor.contains(node)) return false;
+
+    const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    return !element?.closest("math-field");
+  }
+
   function getMathTarget() {
     if (equationDialog.open) return equationEditor;
 
     const focused = document.activeElement;
+
+    // A genuinely focused MathLive field always wins.
     if (
       focused &&
       focused.tagName === "MATH-FIELD" &&
@@ -244,6 +258,15 @@
       return focused;
     }
 
+    // Normal contenteditable text selection/caret must never be hijacked by
+    // a previously focused math-field kept in memory.
+    if (focused === editor || selectionIsInTextEditor()) {
+      clearMathContext();
+      return null;
+    }
+
+    // Only fall back to the remembered MathLive target when browser focus
+    // has temporarily moved away without establishing a normal text caret.
     if (
       activeMathField &&
       activeMathField.isConnected &&
@@ -398,8 +421,17 @@
   function saveSelection() {
     const selection = window.getSelection();
     if (!selection || !selection.rangeCount) return;
+
     const range = selection.getRangeAt(0);
-    if (editor.contains(range.commonAncestorContainer)) savedRange = range.cloneRange();
+    if (!editor.contains(range.commonAncestorContainer)) return;
+
+    const node = range.commonAncestorContainer;
+    const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+
+    if (!element?.closest("math-field")) {
+      savedRange = range.cloneRange();
+      clearMathContext();
+    }
   }
 
   function restoreSelection() {
@@ -980,13 +1012,23 @@ ${body}
     runCommand(command);
   }
 
-  $$("[data-command]").forEach((button) => {
+  $("[data-command]").forEach((button) => {
     button.addEventListener("mousedown", (event) => {
-      const mathTarget = getMathTarget();
-      if (mathTarget) rememberMathContext(mathTarget);
-      else saveSelection();
+      const focused = document.activeElement;
+
+      if (
+        focused &&
+        focused.tagName === "MATH-FIELD" &&
+        editor.contains(focused)
+      ) {
+        rememberMathContext(focused);
+      } else {
+        saveSelection();
+      }
+
       event.preventDefault();
     });
+
     button.addEventListener("click", () => runContextAwareCommand(button.dataset.command));
   });
 
