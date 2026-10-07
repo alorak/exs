@@ -265,16 +265,9 @@
       return null;
     }
 
-    // Only fall back to the remembered MathLive target when browser focus
-    // has temporarily moved away without establishing a normal text caret.
-    if (
-      activeMathField &&
-      activeMathField.isConnected &&
-      editor.contains(activeMathField)
-    ) {
-      return activeMathField;
-    }
-
+    // Never route a toolbar command to a stale math field. Toolbar buttons
+    // prevent pointer focus changes, so an actually active MathLive field
+    // remains document.activeElement and was handled above.
     return null;
   }
 
