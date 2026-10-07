@@ -24,17 +24,41 @@
       <span id="saveState" class="save-state">Kaydedildi</span>
     </div>
 
-    <div class="header-actions">
-      <button id="newButton" class="ghost-button">Yeni</button>
-      <button id="openButton" class="ghost-button">Aç</button>
-      <button id="saveButton" class="primary-button">Kaydet</button>
+    <div class="header-actions" aria-label="Belge işlemleri">
+      <button id="newButton" class="icon-action" type="button" title="Yeni belge" aria-label="Yeni belge">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M12 11v6M9 14h6"/></svg>
+      </button>
+      <button id="openButton" class="icon-action" type="button" title="Belge aç" aria-label="Belge aç">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9"/><path d="M4 7v12h15l2-8H7l-3 8"/></svg>
+      </button>
+      <button id="saveButton" class="icon-action" type="button" title="Kaydet (.exs)" aria-label="Kaydet">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h12l2 2v16H5z"/><path d="M8 3v6h8V3"/><path d="M8 14h8v7"/></svg>
+      </button>
+      <span class="header-separator" aria-hidden="true"></span>
+      <button id="printButton" class="icon-action" type="button" title="Yazdır / PDF" aria-label="Yazdır veya PDF oluştur">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6"/><path d="M6 18H4v-7h16v7h-2"/><path d="M7 15h10v6H7z"/><path d="M17 12h.01"/></svg>
+      </button>
+      <div class="export-menu header-export">
+        <button id="exportButton" class="icon-action" type="button" title="Dışa aktar" aria-label="Dışa aktar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M5 19h14"/></svg>
+        </button>
+        <div id="exportPopover" class="popover" hidden>
+          <button data-export="latex">LaTeX (.tex)</button>
+          <button data-export="html">HTML (.html)</button>
+          <button data-export="text">Düz metin (.txt)</button>
+        </div>
+      </div>
       <input id="openInput" type="file" accept=".exs,.json,application/json" hidden />
     </div>
   </header>
 
   <nav class="menu-bar" aria-label="Ana menü">
-    <button data-menu-action="undo" title="Geri al (Ctrl/Cmd+Z)">Geri al</button>
-    <button data-menu-action="redo" title="Yinele (Ctrl/Cmd+Y)">Yinele</button>
+    <button class="toolbar-icon" data-menu-action="undo" title="Geri al (Ctrl/Cmd+Z)" aria-label="Geri al">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7-5 5 5 5"/><path d="M5 12h8a6 6 0 0 1 6 6"/></svg>
+    </button>
+    <button class="toolbar-icon" data-menu-action="redo" title="Yinele (Ctrl/Cmd+Y)" aria-label="Yinele">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 7 5 5-5 5"/><path d="M19 12h-8a6 6 0 0 0-6 6"/></svg>
+    </button>
     <span class="menu-separator"></span>
 
     <select id="blockStyle" title="Paragraf stili">
@@ -65,25 +89,23 @@
       <button class="math-tool" data-latex="\begin{bmatrix}\placeholder{a}&\placeholder{b}\\\placeholder{c}&\placeholder{d}\end{bmatrix}" title="2×2 matris">▦</button>
     </div>
 
-    <button id="inlineMathButton" title="İmleçte boş matematik alanı">ƒx</button>
-    <button id="displayMathButton" title="Belgeye numaralı canlı denklem ekle">Numaralı</button>
-    <button id="tableButton" title="3×3 tablo ekle">Tablo</button>
-    <button id="imageButton" title="Görsel ekle">Görsel</button>
+    <button id="inlineMathButton" class="toolbar-symbol" title="İmleçte boş matematik alanı" aria-label="Boş matematik alanı">ƒx</button>
+    <button id="displayMathButton" class="toolbar-icon" title="Numaralı canlı denklem ekle" aria-label="Numaralı denklem ekle">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M4 12h7M4 17h10"/><path d="M18 8v8"/><path d="M16.5 10 18 8l1.5 2"/></svg>
+    </button>
+    <button id="tableButton" class="toolbar-icon" title="3×3 tablo ekle" aria-label="Tablo ekle">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9h18M3 14h18M9 4v16M15 4v16"/></svg>
+    </button>
+    <button id="imageButton" class="toolbar-icon" title="Görsel ekle" aria-label="Görsel ekle">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8" cy="9" r="1.5"/><path d="m5 18 5-5 3 3 2-2 4 4"/></svg>
+    </button>
     <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" hidden />
 
     <span class="menu-separator"></span>
 
-    <button id="findButton" title="Bul / değiştir (Ctrl/Cmd+F)">Bul</button>
-    <button id="printButton">Yazdır / PDF</button>
-
-    <div class="export-menu">
-      <button id="exportButton">Dışa aktar ▾</button>
-      <div id="exportPopover" class="popover" hidden>
-        <button data-export="latex">LaTeX (.tex)</button>
-        <button data-export="html">HTML (.html)</button>
-        <button data-export="text">Düz metin (.txt)</button>
-      </div>
-    </div>
+    <button id="findButton" class="toolbar-icon" title="Bul / değiştir (Ctrl/Cmd+F)" aria-label="Bul ve değiştir">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>
+    </button>
   </nav>
 
   <main class="app-shell">

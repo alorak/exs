@@ -102,7 +102,70 @@ select:focus-visible,
 
 .document-title:hover, .document-title:focus { border-color: var(--line); background: #f9fbfc; }
 .save-state { color: var(--muted); font-size: 12px; white-space: nowrap; }
-.header-actions { display: flex; gap: 8px; }
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.header-separator {
+  width: 1px;
+  height: 24px;
+  margin: 0 4px;
+  background: var(--line);
+}
+
+.icon-action,
+.toolbar-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: #344250;
+  background: transparent;
+  border-color: transparent;
+}
+
+.icon-action {
+  width: 35px;
+  height: 35px;
+  padding: 0;
+}
+
+.toolbar-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.icon-action:hover,
+.icon-action:focus-visible,
+.toolbar-icon:hover,
+.toolbar-icon:focus-visible {
+  color: #17212b;
+  background: #f3f6f8;
+  border-color: var(--line);
+}
+
+.icon-action svg,
+.toolbar-icon svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.toolbar-symbol {
+  min-width: 34px !important;
+  padding: 0 6px !important;
+  font-family: "Times New Roman", Cambria, serif;
+  font-size: 17px;
+}
+
 .primary-button, .ghost-button { padding: 8px 12px; }
 
 .primary-button {
@@ -178,6 +241,10 @@ select:focus-visible,
 }
 
 .export-menu { position: relative; }
+
+.header-export .popover {
+  top: 40px;
+}
 
 .popover {
   position: absolute;
@@ -424,7 +491,8 @@ math-field:focus {
 }
 
 /* EXS uses its own math toolbar; MathLive's on-screen keyboard is intentionally disabled. */
-math-field::part(virtual-keyboard-toggle) {
+math-field::part(virtual-keyboard-toggle),
+math-field::part(menu-toggle) {
   display: none !important;
 }
 
@@ -571,9 +639,13 @@ math-field::part(virtual-keyboard-toggle) {
     overflow-y: auto;
     display: block;
   }
-  .app-header { grid-template-columns: auto 1fr auto; gap: 8px; }
+  .app-header { grid-template-columns: auto minmax(100px, 1fr) auto; gap: 8px; padding-inline: 8px; }
   .brand span, .save-state { display: none; }
-  .document-title { width: 100%; }
+  .brand > div:last-child { display: none; }
+  .document-title { width: 100%; min-width: 0; }
+  .header-actions { gap: 1px; }
+  .icon-action { width: 32px; height: 32px; }
+  .header-separator { margin-inline: 2px; }
   .app-shell { display: block; }
   .left-sidebar { display: none; }
   .right-sidebar { border: 0; border-top: 1px solid var(--line); }
