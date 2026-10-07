@@ -827,6 +827,191 @@
     table.after(paragraph);
   }
 
+  function clearTableResizeCursor() {
+    editor.classList.remove(
+      "table-resize-col",
+      "table-resize-row",
+      "table-resizing"
+    );
+  }
+
+  function getTableResizeTarget(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    const cell = target?.closest("td, th");
+    if (!cell || !editor.contains(cell)) return null;
+
+    const table = cell.closest("table");
+    const row = cell.closest("tr");
+    if (!table || !row) return null;
+
+    const model = ensureTableColumnModel(table);
+    if (!model) return null;
+
+    const cellRect = cell.getBoundingClientRect();
+    const threshold = 6;
+    const leftDistance = Math.abs(event.clientX - cellRect.left);
+    const rightDistance = Math.abs(event.clientX - cellRect.right);
+    const topDistance = Math.abs(event.clientY - cellRect.top);
+    const bottomDistance = Math.abs(event.clientY - cellRect.bottom);
+
+    const rowIndex = Array.from(table.rows).indexOf(row);
+    const colIndex = cell.cellIndex;
+
+    const verticalCandidates = [];
+    if (colIndex > 0 && leftDistance <= threshold) {
+      verticalCandidates.push({
+        axis: "col",
+        boundaryIndex: colIndex - 1,
+        distance: leftDistance,
+        table
+      });
+    }
+    if (colIndex < model.columnCount - 1 && rightDistance <= threshold) {
+      verticalCandidates.push({
+        axis: "col",
+        boundaryIndex: colIndex,
+        distance: rightDistance,
+        table
+      });
+    }
+
+    const horizontalCandidates = [];
+    if (rowIndex > 0 && topDistance <= threshold) {
+      horizontalCandidates.push({
+        axis: "row",
+        boundaryIndex: rowIndex - 1,
+        distance: topDistance,
+        table
+      });
+    }
+    if (rowIndex < table.rows.length - 1 && bottomDistance <= threshold) {
+      horizontalCandidates.push({
+        axis: "row",
+        boundaryIndex: rowIndex,
+        distance: bottomDistance,
+        table
+      });
+    }
+
+    const candidates = [...verticalCandidates, ...horizontalCandidates];
+    if (!candidates.length) return null;
+
+    candidates.sort((a, b) => a.distance - b.distance);
+    return candidates[0];
+  }
+
+  function updateTableResizeCursor(event) {
+    if (tableResizeState) return;
+
+    const target = getTableResizeTarget(event);
+    editor.classList.remove("table-resize-col", "table-resize-row");
+
+    if (target?.axis === "col") editor.classList.add("table-resize-col");
+    else if (target?.axis === "row") editor.classList.add("table-resize-row");
+  }
+
+  function beginTableResize(event) {
+    if (event.button !== 0) return false;
+
+    const target = getTableResizeTarget(event);
+    if (!target) return false;
+
+    const table = target.table;
+    const model = ensureTableColumnModel(table);
+    if (!model) return false;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (target.axis === "col") {
+      const leftCol = model.cols[target.boundaryIndex];
+      const rightCol = model.cols[target.boundaryIndex + 1];
+      if (!leftCol || !rightCol) return false;
+
+      const leftWidth = Number(leftCol.dataset.width) || 0;
+      const rightWidth = Number(rightCol.dataset.width) || 0;
+
+      tableResizeState = {
+        axis: "col",
+        table,
+        boundaryIndex: target.boundaryIndex,
+        startX: event.clientX,
+        tableWidth: Math.max(table.getBoundingClientRect().width, 1),
+        leftCol,
+        rightCol,
+        leftWidth,
+        rightWidth
+      };
+      editor.classList.add("table-resize-col", "table-resizing");
+    } else {
+      const row = table.rows[target.boundaryIndex];
+      if (!row) return false;
+
+      tableResizeState = {
+        axis: "row",
+        table,
+        boundaryIndex: target.boundaryIndex,
+        startY: event.clientY,
+        row,
+        startHeight: row.getBoundingClientRect().height
+      };
+      editor.classList.add("table-resize-row", "table-resizing");
+    }
+
+    return true;
+  }
+
+  function continueTableResize(event) {
+    if (!tableResizeState) return;
+
+    event.preventDefault();
+
+    if (tableResizeState.axis === "col") {
+      const {
+        startX,
+        tableWidth,
+        leftCol,
+        rightCol,
+        leftWidth,
+        rightWidth
+      } = tableResizeState;
+
+      const combined = leftWidth + rightWidth;
+      const minimumPercent = Math.min(
+        combined / 2,
+        (44 / tableWidth) * 100
+      );
+      const deltaPercent = ((event.clientX - startX) / tableWidth) * 100;
+      const newLeft = Math.max(
+        minimumPercent,
+        Math.min(combined - minimumPercent, leftWidth + deltaPercent)
+      );
+      const newRight = combined - newLeft;
+
+      leftCol.dataset.width = String(newLeft);
+      rightCol.dataset.width = String(newRight);
+      leftCol.style.width = `${newLeft}%`;
+      rightCol.style.width = `${newRight}%`;
+    } else {
+      const { startY, row, startHeight } = tableResizeState;
+      const newHeight = Math.max(24, startHeight + (event.clientY - startY));
+      row.dataset.height = String(newHeight);
+      row.style.height = `${newHeight}px`;
+    }
+  }
+
+  function finishTableResize() {
+    if (!tableResizeState) {
+      clearTableResizeCursor();
+      return;
+    }
+
+    tableResizeState = null;
+    clearTableResizeCursor();
+    markDirty();
+    scheduleSearchRefresh();
+  }
+
   function getCaretRangeFromPoint(x, y) {
     if (typeof document.caretRangeFromPoint === "function") {
       return document.caretRangeFromPoint(x, y);
