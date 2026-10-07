@@ -22,6 +22,8 @@
   const findCount = $("#findCount");
   const newDocumentDialog = $("#newDocumentDialog");
   const editorContextMenu = $("#editorContextMenu");
+  const mathContextActions = $("#mathContextActions");
+  const mathContextSeparator = $("#mathContextSeparator");
   const tableContextActions = $("#tableContextActions");
   const tableContextSeparator = $("#tableContextSeparator");
   const toast = $("#toast");
@@ -40,6 +42,7 @@
   let activeSearchIndex = -1;
   let lastSearchQuery = "";
   let contextMenuCell = null;
+  let contextMenuMathField = null;
   let contextMenuRange = null;
 
   const greekSymbols = [
@@ -342,7 +345,6 @@
   }
 
   function normalizeDocument() {
-    promoteStandaloneInlineMath();
     attachMathFieldListeners();
     renumberEquations();
     updateOutline();
@@ -698,12 +700,6 @@
       rememberMathContext(candidate);
       markDirty();
       scheduleDocumentRefresh(80);
-      return;
-    }
-
-    const paragraph = getInsertionParagraph();
-    if (paragraph && isEmptyParagraph(paragraph)) {
-      createDisplayMathInParagraph(paragraph, latex);
       return;
     }
 
