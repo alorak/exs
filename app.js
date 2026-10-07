@@ -994,7 +994,7 @@ ${body}
     runCommand("formatBlock", event.target.value);
   });
 
-  $("[data-menu-action]").forEach((button) => {
+  $$("[data-menu-action]").forEach((button) => {
     button.addEventListener("mousedown", (event) => {
       const mathTarget = getMathTarget();
       if (mathTarget) rememberMathContext(mathTarget);
