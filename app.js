@@ -1558,13 +1558,19 @@ ${body}
 
   editor.addEventListener("contextmenu", (event) => {
     const target = event.target instanceof Element ? event.target : null;
-    if (!target || target.closest("math-field")) return;
+    if (!target) return;
 
     event.preventDefault();
     closeFindPopover();
 
-    const cell = target.closest("td, th");
-    showEditorContextMenu(event, cell);
+    const mathContainer = target.closest(".display-equation, .inline-equation");
+    const mathField =
+      target.closest("math-field") ||
+      mathContainer?.querySelector("math-field") ||
+      null;
+    const cell = mathField ? null : target.closest("td, th");
+
+    showEditorContextMenu(event, cell, mathField);
   });
 
   editorContextMenu.addEventListener("click", async (event) => {
@@ -1575,9 +1581,12 @@ ${body}
     event.stopPropagation();
 
     const action = button.dataset.contextAction;
+    const mathField = contextMenuMathField;
     hideEditorContextMenu();
 
-    if (action === "row-above") addTableRow("above");
+    if (action === "math-display") convertMathToDisplay(mathField);
+    else if (action === "math-inline") convertMathToInline(mathField);
+    else if (action === "row-above") addTableRow("above");
     else if (action === "row-below") addTableRow("below");
     else if (action === "column-left") addTableColumn("left");
     else if (action === "column-right") addTableColumn("right");
