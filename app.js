@@ -797,13 +797,25 @@
 
   function hideEditorContextMenu() {
     editorContextMenu.hidden = true;
+    mathContextActions.hidden = true;
+    mathContextSeparator.hidden = true;
     tableContextActions.hidden = true;
     tableContextSeparator.hidden = true;
   }
 
-  function showEditorContextMenu(event, cell = null) {
+  function showEditorContextMenu(event, cell = null, mathField = null) {
     contextMenuCell = cell;
-    captureContextMenuRange(event);
+    contextMenuMathField = mathField;
+
+    if (mathField) contextMenuRange = null;
+    else captureContextMenuRange(event);
+
+    const isDisplayMath = Boolean(mathField?.closest(".display-equation"));
+
+    mathContextActions.hidden = !mathField;
+    mathContextSeparator.hidden = !mathField;
+    $("#mathToDisplayAction").hidden = !mathField || isDisplayMath;
+    $("#mathToInlineAction").hidden = !mathField || !isDisplayMath;
 
     tableContextActions.hidden = !cell;
     tableContextSeparator.hidden = !cell;
@@ -824,6 +836,78 @@
       editorContextMenu.style.left = `${left}px`;
       editorContextMenu.style.top = `${top}px`;
     });
+  }
+
+  function nodesHaveVisibleContent(nodes) {
+    return nodes.some((node) => {
+      if (node.nodeType === Node.TEXT_NODE) return Boolean((node.textContent || "").trim());
+      return node.nodeType === Node.ELEMENT_NODE && node.tagName !== "BR";
+    });
+  }
+
+  function focusConvertedMath(field) {
+    normalizeDocument();
+    markDirty();
+    scheduleSearchRefresh();
+
+    requestAnimationFrame(() => {
+      field.focus();
+      rememberMathContext(field);
+    });
+  }
+
+  function convertMathToDisplay(field) {
+    const inlineWrapper = field?.closest(".inline-equation");
+    if (!inlineWrapper) return;
+
+    const parent = inlineWrapper.parentElement;
+    const display = buildDisplayEquationFromField(field);
+
+    if (parent?.tagName === "P") {
+      const siblings = Array.from(parent.childNodes);
+      const index = siblings.indexOf(inlineWrapper);
+      const beforeNodes = siblings.slice(0, index);
+      const afterNodes = siblings.slice(index + 1);
+      const replacements = [];
+
+      if (nodesHaveVisibleContent(beforeNodes)) {
+        const beforeParagraph = document.createElement("p");
+        beforeNodes.forEach((node) => beforeParagraph.append(node));
+        replacements.push(beforeParagraph);
+      }
+
+      replacements.push(display);
+
+      const afterParagraph = document.createElement("p");
+      if (nodesHaveVisibleContent(afterNodes)) {
+        afterNodes.forEach((node) => afterParagraph.append(node));
+      } else {
+        afterParagraph.innerHTML = "<br>";
+      }
+      replacements.push(afterParagraph);
+
+      parent.replaceWith(...replacements);
+    } else {
+      inlineWrapper.replaceWith(display);
+    }
+
+    focusConvertedMath(field);
+  }
+
+  function convertMathToInline(field) {
+    const display = field?.closest(".display-equation");
+    if (!display) return;
+
+    const inlineWrapper = document.createElement("span");
+    inlineWrapper.className = "inline-equation";
+    inlineWrapper.setAttribute("contenteditable", "false");
+    inlineWrapper.append(field);
+
+    const paragraph = document.createElement("p");
+    paragraph.append(inlineWrapper, document.createTextNode(" "));
+    display.replaceWith(paragraph);
+
+    focusConvertedMath(field);
   }
 
   function createEmptyTableCell(tagName = "TD") {
