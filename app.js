@@ -1465,6 +1465,36 @@ ${body}
     if (!target?.closest("math-field")) clearMathContext();
   });
 
+  editor.addEventListener("contextmenu", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target || target.closest("math-field")) return;
+
+    event.preventDefault();
+    closeFindPopover();
+
+    const cell = target.closest("td, th");
+    showEditorContextMenu(event, cell);
+  });
+
+  editorContextMenu.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-context-action]");
+    if (!button) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const action = button.dataset.contextAction;
+    hideEditorContextMenu();
+
+    if (action === "row-above") addTableRow("above");
+    else if (action === "row-below") addTableRow("below");
+    else if (action === "column-left") addTableColumn("left");
+    else if (action === "column-right") addTableColumn("right");
+    else if (action === "copy") await copyEditorSelection();
+    else if (action === "paste") await pasteFromClipboard(false);
+    else if (action === "paste-plain") await pasteFromClipboard(true);
+  });
+
   titleInput.addEventListener("input", markDirty);
 
   $$("#greekPalette button, #symbolPalette button, .template-grid button, #mathToolbar button").forEach((button) => {
@@ -1741,11 +1771,27 @@ ${body}
     showToast(`${count} eşleşme değiştirildi.`);
   });
 
-  document.addEventListener("click", () => {
+  document.addEventListener("click", (event) => {
     if (!findPopover.hidden) closeFindPopover();
+    if (
+      !editorContextMenu.hidden &&
+      !event.target.closest("#editorContextMenu")
+    ) {
+      hideEditorContextMenu();
+    }
   });
 
-  window.addEventListener("resize", positionFindPopover);
+  document.addEventListener("contextmenu", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target || !editor.contains(target)) hideEditorContextMenu();
+  });
+
+  window.addEventListener("resize", () => {
+    positionFindPopover();
+    hideEditorContextMenu();
+  });
+
+  window.addEventListener("scroll", hideEditorContextMenu, true);
 
   $$(".tab-button").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1757,6 +1803,13 @@ ${body}
 
   document.addEventListener("keydown", (event) => {
     const modifier = event.ctrlKey || event.metaKey;
+
+    if (event.key === "Escape" && !editorContextMenu.hidden) {
+      event.preventDefault();
+      hideEditorContextMenu();
+      editor.focus();
+      return;
+    }
 
     if (event.key === "Escape" && !findPopover.hidden) {
       closeFindPopover();
