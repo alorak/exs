@@ -182,6 +182,12 @@
       // The attribute above remains the source of truth before upgrade.
     }
 
+    try {
+      if ("menuItems" in field) field.menuItems = [];
+    } catch {
+      // Menu customization is available after the custom element upgrade.
+    }
+
     if (field.dataset.exsKeyboardDisabled !== "1") {
       field.dataset.exsKeyboardDisabled = "1";
       field.addEventListener("focusin", hideMathVirtualKeyboard);
