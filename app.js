@@ -287,7 +287,53 @@
     }
   }
 
+  function isWhitespaceTextNode(node) {
+    return node.nodeType === Node.TEXT_NODE && !(node.textContent || "").trim();
+  }
+
+  function isStandaloneInlineEquation(wrapper) {
+    const parent = wrapper?.parentElement;
+    if (!parent || parent.tagName !== "P") return false;
+
+    return Array.from(parent.childNodes).every((node) => {
+      if (node === wrapper) return true;
+      if (isWhitespaceTextNode(node)) return true;
+      return node.nodeType === Node.ELEMENT_NODE && node.tagName === "BR";
+    });
+  }
+
+  function buildDisplayEquationFromField(field) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "display-equation";
+    wrapper.setAttribute("contenteditable", "false");
+
+    const center = document.createElement("div");
+    center.className = "equation-center";
+    center.append(field);
+
+    const number = document.createElement("span");
+    number.className = "equation-number";
+
+    wrapper.append(center, number);
+    return wrapper;
+  }
+
+  function promoteStandaloneInlineMath() {
+    const standalone = Array.from(editor.querySelectorAll(".inline-equation"))
+      .filter(isStandaloneInlineEquation);
+
+    standalone.forEach((inlineWrapper) => {
+      const parent = inlineWrapper.parentElement;
+      const field = inlineWrapper.querySelector("math-field");
+      if (!parent || !field) return;
+
+      const display = buildDisplayEquationFromField(field);
+      parent.replaceWith(display);
+    });
+  }
+
   function normalizeDocument() {
+    promoteStandaloneInlineMath();
     attachMathFieldListeners();
     renumberEquations();
     updateOutline();
@@ -548,6 +594,46 @@
     });
   }
 
+  function getInsertionParagraph() {
+    const range = savedRange;
+    if (!range) return null;
+
+    const node = range.startContainer;
+    const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    const paragraph = element?.closest("p");
+
+    return paragraph && editor.contains(paragraph) ? paragraph : null;
+  }
+
+  function isEmptyParagraph(paragraph) {
+    if (!paragraph || paragraph.tagName !== "P") return false;
+
+    return Array.from(paragraph.childNodes).every((node) => {
+      if (isWhitespaceTextNode(node)) return true;
+      return node.nodeType === Node.ELEMENT_NODE && node.tagName === "BR";
+    });
+  }
+
+  function createDisplayMathInParagraph(paragraph, latex = "\\placeholder{}") {
+    const field = document.createElement("math-field");
+    field.setAttribute("smart-fence", "");
+    field.setAttribute("contenteditable", "true");
+    field.setAttribute("math-virtual-keyboard-policy", "manual");
+    field.textContent = latex;
+
+    const wrapper = buildDisplayEquationFromField(field);
+    paragraph.replaceWith(wrapper);
+
+    const nextParagraph = document.createElement("p");
+    nextParagraph.innerHTML = "<br>";
+    wrapper.after(nextParagraph);
+
+    normalizeDocument();
+    markDirty();
+    focusMathField(field);
+    return field;
+  }
+
   function createInlineMath(latex = "\\placeholder{}") {
     const wrapper = document.createElement("span");
     wrapper.className = "inline-equation";
@@ -567,29 +653,23 @@
   }
 
   function createDisplayMath(latex = "\\placeholder{}") {
-    const wrapper = document.createElement("div");
-    wrapper.className = "display-equation";
-    wrapper.setAttribute("contenteditable", "false");
-
-    const center = document.createElement("div");
-    center.className = "equation-center";
+    const paragraph = getInsertionParagraph();
+    if (paragraph && isEmptyParagraph(paragraph)) {
+      return createDisplayMathInParagraph(paragraph, latex);
+    }
 
     const field = document.createElement("math-field");
     field.setAttribute("smart-fence", "");
     field.setAttribute("contenteditable", "true");
     field.setAttribute("math-virtual-keyboard-policy", "manual");
     field.textContent = latex;
-    center.append(field);
 
-    const number = document.createElement("span");
-    number.className = "equation-number";
-    wrapper.append(center, number);
-
+    const wrapper = buildDisplayEquationFromField(field);
     insertNodeAtSelection(wrapper);
 
-    const paragraph = document.createElement("p");
-    paragraph.innerHTML = "<br>";
-    wrapper.after(paragraph);
+    const paragraphAfter = document.createElement("p");
+    paragraphAfter.innerHTML = "<br>";
+    wrapper.after(paragraphAfter);
 
     normalizeDocument();
     focusMathField(field);
@@ -609,6 +689,12 @@
       rememberMathContext(candidate);
       markDirty();
       scheduleDocumentRefresh(80);
+      return;
+    }
+
+    const paragraph = getInsertionParagraph();
+    if (paragraph && isEmptyParagraph(paragraph)) {
+      createDisplayMathInParagraph(paragraph, latex);
       return;
     }
 
