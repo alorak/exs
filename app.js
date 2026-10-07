@@ -749,19 +749,30 @@
 
   function captureContextMenuRange(event) {
     const selection = window.getSelection();
+    const pointRange = getCaretRangeFromPoint(event.clientX, event.clientY);
 
     if (selection?.rangeCount) {
       const selectedRange = selection.getRangeAt(0);
-      if (
-        editor.contains(selectedRange.commonAncestorContainer) &&
-        !selectedRange.collapsed
-      ) {
-        contextMenuRange = selectedRange.cloneRange();
-        return;
+      const selectionIsInEditor = editor.contains(selectedRange.commonAncestorContainer);
+
+      if (selectionIsInEditor && !selectedRange.collapsed && pointRange) {
+        let clickedInsideSelection = false;
+        try {
+          clickedInsideSelection = selectedRange.isPointInRange(
+            pointRange.startContainer,
+            pointRange.startOffset
+          );
+        } catch {
+          clickedInsideSelection = false;
+        }
+
+        if (clickedInsideSelection) {
+          contextMenuRange = selectedRange.cloneRange();
+          return;
+        }
       }
     }
 
-    const pointRange = getCaretRangeFromPoint(event.clientX, event.clientY);
     if (pointRange && editor.contains(pointRange.commonAncestorContainer)) {
       contextMenuRange = pointRange.cloneRange();
       savedRange = pointRange.cloneRange();
