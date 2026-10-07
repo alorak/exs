@@ -146,6 +146,37 @@ select:focus-visible,
   flex: 0 0 auto;
 }
 
+.math-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+.math-tool {
+  width: 34px;
+  height: 32px;
+  padding: 0 4px;
+  display: inline-grid;
+  place-items: center;
+  border-color: transparent;
+  background: transparent;
+  font-family: "Times New Roman", Cambria, serif;
+  font-size: 21px;
+  line-height: 1;
+}
+
+.math-tool:hover,
+.math-tool:focus-visible {
+  border-color: var(--line);
+  background: #fff;
+}
+
+.math-tool-wide {
+  width: 42px;
+  font-size: 17px;
+}
+
 .export-menu { position: relative; }
 
 .popover {
@@ -345,10 +376,16 @@ select:focus-visible,
 .inline-equation math-field {
   display: inline-block;
   min-width: 1.2em;
+  max-width: 100%;
   border: 0;
-  padding: 0 .04em;
+  padding: .06em .08em;
   font-size: 1em;
   background: transparent;
+  vertical-align: middle;
+}
+
+.inline-equation math-field:focus {
+  min-width: 2.2em;
 }
 
 .display-equation {

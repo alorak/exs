@@ -53,8 +53,20 @@
 
     <span class="menu-separator"></span>
 
-    <button id="inlineMathButton" title="Satır içi matematik">Inline ∑</button>
-    <button id="displayMathButton" title="Numaralı denklem">Denklem</button>
+    <div id="mathToolbar" class="math-toolbar" aria-label="Dinamik matematik araçları">
+      <button class="math-tool" data-latex="\displaystyle\sum_{\placeholder{i=1}}^{\placeholder{n}}\placeholder{x_i}" title="Toplam">∑</button>
+      <button class="math-tool" data-latex="\displaystyle\prod_{\placeholder{i=1}}^{\placeholder{n}}\placeholder{x_i}" title="Çarpım">∏</button>
+      <button class="math-tool" data-latex="\displaystyle\int_{\placeholder{a}}^{\placeholder{b}}\placeholder{f(x)}\,d\placeholder{x}" title="İntegral">∫</button>
+      <button class="math-tool math-tool-wide" data-latex="\displaystyle\frac{\placeholder{a}}{\placeholder{b}}" title="Kesir">½</button>
+      <button class="math-tool" data-latex="\sqrt{\placeholder{x}}" title="Karekök">√</button>
+      <button class="math-tool math-tool-wide" data-latex="\lim_{\placeholder{x}\to\placeholder{a}}\placeholder{f(x)}" title="Limit">lim</button>
+      <button class="math-tool" data-latex="\left(\placeholder{x}\right)" title="Parantez">( )</button>
+      <button class="math-tool" data-latex="\vec{\placeholder{v}}" title="Vektör">v⃗</button>
+      <button class="math-tool" data-latex="\begin{bmatrix}\placeholder{a}&\placeholder{b}\\\placeholder{c}&\placeholder{d}\end{bmatrix}" title="2×2 matris">▦</button>
+    </div>
+
+    <button id="inlineMathButton" title="İmleçte boş matematik alanı">ƒx</button>
+    <button id="displayMathButton" title="Belgeye numaralı canlı denklem ekle">Numaralı</button>
     <button id="tableButton" title="3×3 tablo ekle">Tablo</button>
     <button id="imageButton" title="Görsel ekle">Görsel</button>
     <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" hidden />
