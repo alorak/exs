@@ -241,6 +241,19 @@
 
 
   <div id="editorContextMenu" class="context-menu" role="menu" hidden>
+    <div id="mathContextActions" class="context-menu-section" hidden>
+      <button id="mathToDisplayAction" type="button" role="menuitem" data-context-action="math-display">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 17h14"/><path d="M8 12h8"/><path d="M4 4v16M20 4v16"/></svg>
+        <span>Denkleme dönüştür</span>
+      </button>
+      <button id="mathToInlineAction" type="button" role="menuitem" data-context-action="math-inline">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h5M16 8h5M3 16h18"/><path d="M10 6c-2 2-2 10 0 12M14 6c2 2 2 10 0 12"/></svg>
+        <span>Metin içinde tut</span>
+      </button>
+    </div>
+
+    <div id="mathContextSeparator" class="context-menu-separator" hidden></div>
+
     <div id="tableContextActions" class="context-menu-section" hidden>
       <button type="button" role="menuitem" data-context-action="row-above">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h16M4 15h16M8 5v14M16 5v14"/><path d="m12 2-2 2h4z"/></svg>

@@ -22,6 +22,8 @@
   const findCount = $("#findCount");
   const newDocumentDialog = $("#newDocumentDialog");
   const editorContextMenu = $("#editorContextMenu");
+  const mathContextActions = $("#mathContextActions");
+  const mathContextSeparator = $("#mathContextSeparator");
   const tableContextActions = $("#tableContextActions");
   const tableContextSeparator = $("#tableContextSeparator");
   const toast = $("#toast");
@@ -40,6 +42,7 @@
   let activeSearchIndex = -1;
   let lastSearchQuery = "";
   let contextMenuCell = null;
+  let contextMenuMathField = null;
   let contextMenuRange = null;
 
   const greekSymbols = [
@@ -300,17 +303,6 @@
     return node.nodeType === Node.TEXT_NODE && !(node.textContent || "").trim();
   }
 
-  function isStandaloneInlineEquation(wrapper) {
-    const parent = wrapper?.parentElement;
-    if (!parent || parent.tagName !== "P") return false;
-
-    return Array.from(parent.childNodes).every((node) => {
-      if (node === wrapper) return true;
-      if (isWhitespaceTextNode(node)) return true;
-      return node.nodeType === Node.ELEMENT_NODE && node.tagName === "BR";
-    });
-  }
-
   function buildDisplayEquationFromField(field) {
     const wrapper = document.createElement("div");
     wrapper.className = "display-equation";
@@ -327,22 +319,7 @@
     return wrapper;
   }
 
-  function promoteStandaloneInlineMath() {
-    const standalone = Array.from(editor.querySelectorAll(".inline-equation"))
-      .filter(isStandaloneInlineEquation);
-
-    standalone.forEach((inlineWrapper) => {
-      const parent = inlineWrapper.parentElement;
-      const field = inlineWrapper.querySelector("math-field");
-      if (!parent || !field) return;
-
-      const display = buildDisplayEquationFromField(field);
-      parent.replaceWith(display);
-    });
-  }
-
   function normalizeDocument() {
-    promoteStandaloneInlineMath();
     attachMathFieldListeners();
     renumberEquations();
     updateOutline();
@@ -701,12 +678,6 @@
       return;
     }
 
-    const paragraph = getInsertionParagraph();
-    if (paragraph && isEmptyParagraph(paragraph)) {
-      createDisplayMathInParagraph(paragraph, latex);
-      return;
-    }
-
     createInlineMath(latex);
   }
 
@@ -801,13 +772,25 @@
 
   function hideEditorContextMenu() {
     editorContextMenu.hidden = true;
+    mathContextActions.hidden = true;
+    mathContextSeparator.hidden = true;
     tableContextActions.hidden = true;
     tableContextSeparator.hidden = true;
   }
 
-  function showEditorContextMenu(event, cell = null) {
+  function showEditorContextMenu(event, cell = null, mathField = null) {
     contextMenuCell = cell;
-    captureContextMenuRange(event);
+    contextMenuMathField = mathField;
+
+    if (mathField) contextMenuRange = null;
+    else captureContextMenuRange(event);
+
+    const isDisplayMath = Boolean(mathField?.closest(".display-equation"));
+
+    mathContextActions.hidden = !mathField;
+    mathContextSeparator.hidden = !mathField;
+    $("#mathToDisplayAction").hidden = !mathField || isDisplayMath;
+    $("#mathToInlineAction").hidden = !mathField || !isDisplayMath;
 
     tableContextActions.hidden = !cell;
     tableContextSeparator.hidden = !cell;
@@ -828,6 +811,78 @@
       editorContextMenu.style.left = `${left}px`;
       editorContextMenu.style.top = `${top}px`;
     });
+  }
+
+  function nodesHaveVisibleContent(nodes) {
+    return nodes.some((node) => {
+      if (node.nodeType === Node.TEXT_NODE) return Boolean((node.textContent || "").trim());
+      return node.nodeType === Node.ELEMENT_NODE && node.tagName !== "BR";
+    });
+  }
+
+  function focusConvertedMath(field) {
+    normalizeDocument();
+    markDirty();
+    scheduleSearchRefresh();
+
+    requestAnimationFrame(() => {
+      field.focus();
+      rememberMathContext(field);
+    });
+  }
+
+  function convertMathToDisplay(field) {
+    const inlineWrapper = field?.closest(".inline-equation");
+    if (!inlineWrapper) return;
+
+    const parent = inlineWrapper.parentElement;
+    const display = buildDisplayEquationFromField(field);
+
+    if (parent?.tagName === "P") {
+      const siblings = Array.from(parent.childNodes);
+      const index = siblings.indexOf(inlineWrapper);
+      const beforeNodes = siblings.slice(0, index);
+      const afterNodes = siblings.slice(index + 1);
+      const replacements = [];
+
+      if (nodesHaveVisibleContent(beforeNodes)) {
+        const beforeParagraph = document.createElement("p");
+        beforeNodes.forEach((node) => beforeParagraph.append(node));
+        replacements.push(beforeParagraph);
+      }
+
+      replacements.push(display);
+
+      const afterParagraph = document.createElement("p");
+      if (nodesHaveVisibleContent(afterNodes)) {
+        afterNodes.forEach((node) => afterParagraph.append(node));
+      } else {
+        afterParagraph.innerHTML = "<br>";
+      }
+      replacements.push(afterParagraph);
+
+      parent.replaceWith(...replacements);
+    } else {
+      inlineWrapper.replaceWith(display);
+    }
+
+    focusConvertedMath(field);
+  }
+
+  function convertMathToInline(field) {
+    const display = field?.closest(".display-equation");
+    if (!display) return;
+
+    const inlineWrapper = document.createElement("span");
+    inlineWrapper.className = "inline-equation";
+    inlineWrapper.setAttribute("contenteditable", "false");
+    inlineWrapper.append(field);
+
+    const paragraph = document.createElement("p");
+    paragraph.append(inlineWrapper, document.createTextNode(" "));
+    display.replaceWith(paragraph);
+
+    focusConvertedMath(field);
   }
 
   function createEmptyTableCell(tagName = "TD") {
@@ -1478,13 +1533,19 @@ ${body}
 
   editor.addEventListener("contextmenu", (event) => {
     const target = event.target instanceof Element ? event.target : null;
-    if (!target || target.closest("math-field")) return;
+    if (!target) return;
 
     event.preventDefault();
     closeFindPopover();
 
-    const cell = target.closest("td, th");
-    showEditorContextMenu(event, cell);
+    const mathContainer = target.closest(".display-equation, .inline-equation");
+    const mathField =
+      target.closest("math-field") ||
+      mathContainer?.querySelector("math-field") ||
+      null;
+    const cell = mathField ? null : target.closest("td, th");
+
+    showEditorContextMenu(event, cell, mathField);
   });
 
   editorContextMenu.addEventListener("click", async (event) => {
@@ -1495,9 +1556,12 @@ ${body}
     event.stopPropagation();
 
     const action = button.dataset.contextAction;
+    const mathField = contextMenuMathField;
     hideEditorContextMenu();
 
-    if (action === "row-above") addTableRow("above");
+    if (action === "math-display") convertMathToDisplay(mathField);
+    else if (action === "math-inline") convertMathToInline(mathField);
+    else if (action === "row-above") addTableRow("above");
     else if (action === "row-below") addTableRow("below");
     else if (action === "column-left") addTableColumn("left");
     else if (action === "column-right") addTableColumn("right");

@@ -522,7 +522,7 @@ select:focus-visible,
   scrollbar-gutter: stable both-edges;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y;
-  padding: 34px 46px 96px;
+  padding: 12px 46px 96px;
   background:
     linear-gradient(#eef2f6 1px, transparent 1px),
     linear-gradient(90deg, #eef2f6 1px, transparent 1px),
