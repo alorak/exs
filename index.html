@@ -240,6 +240,44 @@
 
 
 
+  <div id="editorContextMenu" class="context-menu" role="menu" hidden>
+    <div id="tableContextActions" class="context-menu-section" hidden>
+      <button type="button" role="menuitem" data-context-action="row-above">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h16M4 15h16M8 5v14M16 5v14"/><path d="m12 2-2 2h4z"/></svg>
+        <span>Üste satır ekle</span>
+      </button>
+      <button type="button" role="menuitem" data-context-action="row-below">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h16M4 15h16M8 5v14M16 5v14"/><path d="m12 22-2-2h4z"/></svg>
+        <span>Alta satır ekle</span>
+      </button>
+      <button type="button" role="menuitem" data-context-action="column-left">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v16M15 4v16M5 8h14M5 16h14"/><path d="m2 12 2-2v4z"/></svg>
+        <span>Sola sütun ekle</span>
+      </button>
+      <button type="button" role="menuitem" data-context-action="column-right">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v16M15 4v16M5 8h14M5 16h14"/><path d="m22 12-2-2v4z"/></svg>
+        <span>Sağa sütun ekle</span>
+      </button>
+    </div>
+
+    <div id="tableContextSeparator" class="context-menu-separator" hidden></div>
+
+    <div class="context-menu-section">
+      <button type="button" role="menuitem" data-context-action="copy">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="12" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/></svg>
+        <span>Kopyala</span>
+      </button>
+      <button type="button" role="menuitem" data-context-action="paste">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h6"/><rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 3h6v4H9z"/></svg>
+        <span>Yapıştır</span>
+      </button>
+      <button type="button" role="menuitem" data-context-action="paste-plain">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h6"/><rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 3h6v4H9zM9 12h6M9 16h4"/></svg>
+        <span>Düz yapıştır</span>
+      </button>
+    </div>
+  </div>
+
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <script src="./app.js"></script>
 </body>
