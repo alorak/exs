@@ -44,6 +44,7 @@
   let contextMenuCell = null;
   let contextMenuMathField = null;
   let contextMenuRange = null;
+  let tableResizeState = null;
 
   const greekSymbols = [
     ["α", "\\alpha"], ["β", "\\beta"], ["γ", "\\gamma"], ["δ", "\\delta"],
@@ -122,7 +123,7 @@
     const allowedTags = new Set([
       "DIV", "SPAN", "P", "BR", "H1", "H2", "H3", "BLOCKQUOTE",
       "B", "STRONG", "I", "EM", "U", "S", "SUP", "SUB",
-      "UL", "OL", "LI", "TABLE", "THEAD", "TBODY", "TR", "TH", "TD",
+      "UL", "OL", "LI", "TABLE", "COLGROUP", "COL", "THEAD", "TBODY", "TR", "TH", "TD",
       "IMG", "A", "MATH-FIELD"
     ]);
 
@@ -142,7 +143,7 @@
         Array.from(child.attributes).forEach((attr) => {
           const name = attr.name.toLowerCase();
           if (name.startsWith("on")) child.removeAttribute(attr.name);
-          if (!["class", "href", "src", "alt", "title", "data-label", "contenteditable", "smart-fence", "math-virtual-keyboard-policy"].includes(name)) {
+          if (!["class", "href", "src", "alt", "title", "data-label", "data-font-size", "data-width", "data-height", "contenteditable", "smart-fence", "math-virtual-keyboard-policy"].includes(name)) {
             child.removeAttribute(attr.name);
           }
         });
@@ -319,7 +320,86 @@
     return wrapper;
   }
 
+  function applyPersistedFontSizes() {
+    editor.querySelectorAll("[data-font-size]").forEach((node) => {
+      const size = Number(node.dataset.fontSize);
+      if (!Number.isFinite(size) || size < 6 || size > 96) {
+        node.removeAttribute("data-font-size");
+        node.style.removeProperty("font-size");
+        return;
+      }
+      node.style.fontSize = `${size}pt`;
+    });
+  }
+
+  function ensureTableColumnModel(table) {
+    const rows = Array.from(table.rows);
+    const columnCount = rows.reduce(
+      (max, row) => Math.max(max, row.cells.length),
+      0
+    );
+    if (!columnCount) return null;
+
+    let colgroup = table.querySelector(":scope > colgroup");
+    if (!colgroup) {
+      colgroup = document.createElement("colgroup");
+      table.prepend(colgroup);
+    }
+
+    while (colgroup.children.length < columnCount) {
+      colgroup.append(document.createElement("col"));
+    }
+    while (colgroup.children.length > columnCount) {
+      colgroup.lastElementChild?.remove();
+    }
+
+    const cols = Array.from(colgroup.children);
+    const hasStoredWidths = cols.every((col) => {
+      const value = Number(col.dataset.width);
+      return Number.isFinite(value) && value > 0;
+    });
+
+    if (!hasStoredWidths) {
+      const equalWidth = 100 / columnCount;
+      cols.forEach((col) => {
+        col.dataset.width = String(equalWidth);
+      });
+    }
+
+    const total = cols.reduce(
+      (sum, col) => sum + (Number(col.dataset.width) || 0),
+      0
+    );
+
+    if (total > 0) {
+      cols.forEach((col) => {
+        const normalized = ((Number(col.dataset.width) || 0) / total) * 100;
+        col.dataset.width = String(normalized);
+        col.style.width = `${normalized}%`;
+      });
+    }
+
+    return { colgroup, cols, columnCount };
+  }
+
+  function applyPersistedTableDimensions() {
+    editor.querySelectorAll("table").forEach((table) => {
+      ensureTableColumnModel(table);
+
+      Array.from(table.rows).forEach((row) => {
+        const height = Number(row.dataset.height);
+        if (Number.isFinite(height) && height >= 24) {
+          row.style.height = `${height}px`;
+        } else {
+          row.style.removeProperty("height");
+        }
+      });
+    });
+  }
+
   function normalizeDocument() {
+    applyPersistedFontSizes();
+    applyPersistedTableDimensions();
     attachMathFieldListeners();
     renumberEquations();
     updateOutline();
@@ -679,6 +759,53 @@
     }
 
     createInlineMath(latex);
+  }
+
+  function convertBrowserFontSize(size) {
+    editor.querySelectorAll('font[size="7"]').forEach((font) => {
+      const span = document.createElement("span");
+      span.dataset.fontSize = String(size);
+      span.style.fontSize = `${size}pt`;
+      while (font.firstChild) span.append(font.firstChild);
+      font.replaceWith(span);
+    });
+  }
+
+  function applyFontSize(size) {
+    const numericSize = Number(size);
+    if (!Number.isFinite(numericSize)) return;
+
+    const mathTarget = getMathTarget();
+    if (mathTarget && editor.contains(mathTarget)) {
+      mathTarget.dataset.fontSize = String(numericSize);
+      mathTarget.style.fontSize = `${numericSize}pt`;
+      markDirty();
+      return;
+    }
+
+    restoreSelection();
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
+    if (!editor.contains(range.commonAncestorContainer)) return;
+
+    if (!range.collapsed) {
+      document.execCommand("fontSize", false, "7");
+      convertBrowserFontSize(numericSize);
+    } else {
+      const node = range.startContainer;
+      const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+      const block = element?.closest("p,h1,h2,h3,blockquote,li,td,th") || editor;
+      if (block !== editor) {
+        block.dataset.fontSize = String(numericSize);
+        block.style.fontSize = `${numericSize}pt`;
+      }
+    }
+
+    saveSelection();
+    normalizeDocument();
+    markDirty();
   }
 
   function insertTable() {
