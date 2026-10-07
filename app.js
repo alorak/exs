@@ -1178,7 +1178,6 @@ ${body}
   $("#newButton").addEventListener("click", () => {
     if (!confirm("Yeni belge oluşturulsun mu? Mevcut belgeniz tarayıcıda otomatik kaydedilmiş olsa da çalışma alanı sıfırlanır.")) return;
     titleInput.value = "Adsız bilimsel belge";
-    authorInput.value = "";
     editor.innerHTML = "<h1>Bilimsel Belge</h1><p><br></p>";
     normalizeDocument();
     saveLocal();
