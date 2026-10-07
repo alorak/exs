@@ -25,6 +25,8 @@
   let equationMode = "display";
   let editingEquation = null;
   let activeMathField = null;
+  let activeMathSelection = null;
+  let activeMathPosition = null;
   let saveTimer = null;
   let uiRefreshTimer = null;
   let toastTimer = null;
@@ -195,6 +197,80 @@
     }
   }
 
+  function cloneMathSelection(selection) {
+    if (!selection) return null;
+    try {
+      return typeof structuredClone === "function"
+        ? structuredClone(selection)
+        : JSON.parse(JSON.stringify(selection));
+    } catch {
+      return null;
+    }
+  }
+
+  function rememberMathContext(field) {
+    if (!field || !field.isConnected) return;
+    activeMathField = field;
+
+    try {
+      activeMathSelection = cloneMathSelection(field.selection);
+    } catch {
+      activeMathSelection = null;
+    }
+
+    try {
+      activeMathPosition = Number.isFinite(field.position) ? field.position : null;
+    } catch {
+      activeMathPosition = null;
+    }
+  }
+
+  function clearMathContext() {
+    activeMathField = null;
+    activeMathSelection = null;
+    activeMathPosition = null;
+  }
+
+  function getMathTarget() {
+    if (equationDialog.open) return equationEditor;
+
+    const focused = document.activeElement;
+    if (
+      focused &&
+      focused.tagName === "MATH-FIELD" &&
+      editor.contains(focused)
+    ) {
+      rememberMathContext(focused);
+      return focused;
+    }
+
+    if (
+      activeMathField &&
+      activeMathField.isConnected &&
+      editor.contains(activeMathField)
+    ) {
+      return activeMathField;
+    }
+
+    return null;
+  }
+
+  function restoreMathContext(field) {
+    if (!field) return;
+
+    field.focus();
+
+    try {
+      if (activeMathSelection) {
+        field.selection = cloneMathSelection(activeMathSelection);
+      } else if (Number.isFinite(activeMathPosition)) {
+        field.position = activeMathPosition;
+      }
+    } catch {
+      // If a saved range became invalid after an edit, MathLive keeps its current caret.
+    }
+  }
+
   function normalizeDocument() {
     attachMathFieldListeners();
     renumberEquations();
@@ -215,10 +291,22 @@
       if (field.dataset.exsBound === "1") return;
       field.dataset.exsBound = "1";
       field.addEventListener("focus", () => {
-        activeMathField = field;
+        rememberMathContext(field);
         hideMathVirtualKeyboard();
       });
+      field.addEventListener("focusin", () => {
+        rememberMathContext(field);
+        hideMathVirtualKeyboard();
+      });
+      field.addEventListener("pointerdown", () => {
+        activeMathField = field;
+        requestAnimationFrame(() => rememberMathContext(field));
+      });
+      field.addEventListener("selection-change", () => {
+        rememberMathContext(field);
+      });
       field.addEventListener("input", () => {
+        rememberMathContext(field);
         markDirty();
         scheduleDocumentRefresh(140);
       });
@@ -424,6 +512,7 @@
     requestAnimationFrame(() => {
       activeMathField = field;
       field.focus();
+      rememberMathContext(field);
       if (typeof field.executeCommand === "function") {
         try {
           field.executeCommand("moveToNextPlaceholder");
@@ -483,16 +572,16 @@
   }
 
   function insertLatex(latex) {
-    if (equationDialog.open && typeof equationEditor.insert === "function") {
-      equationEditor.insert(latex, { selectionMode: "placeholder" });
-      equationEditor.focus();
-      return;
-    }
+    const candidate = getMathTarget();
 
-    const candidate = activeMathField && editor.contains(activeMathField) ? activeMathField : null;
     if (candidate && typeof candidate.insert === "function") {
-      candidate.insert(latex, { selectionMode: "placeholder" });
+      restoreMathContext(candidate);
+      candidate.insert(latex, {
+        insertionMode: "replaceSelection",
+        selectionMode: "placeholder"
+      });
       candidate.focus();
+      rememberMathContext(candidate);
       markDirty();
       scheduleDocumentRefresh(80);
       return;
@@ -807,15 +896,17 @@ ${body}
   editor.addEventListener("focusout", saveSelection);
   editor.addEventListener("pointerdown", (event) => {
     const target = event.target instanceof Element ? event.target : null;
-    if (!target?.closest("math-field")) activeMathField = null;
+    if (!target?.closest("math-field")) clearMathContext();
   });
 
   titleInput.addEventListener("input", markDirty);
   authorInput.addEventListener("input", markDirty);
 
-  $$("#greekPalette button, #symbolPalette button, .template-grid button, #mathToolbar button").forEach((button) => {
+  $("#greekPalette button, #symbolPalette button, .template-grid button, #mathToolbar button").forEach((button) => {
     button.addEventListener("mousedown", (event) => {
-      saveSelection();
+      const mathTarget = getMathTarget();
+      if (mathTarget) rememberMathContext(mathTarget);
+      else saveSelection();
       event.preventDefault();
     });
   });
@@ -825,28 +916,48 @@ ${body}
   });
 
   function runContextAwareCommand(command) {
-    const candidate = activeMathField && editor.contains(activeMathField) ? activeMathField : null;
+    const candidate = getMathTarget();
 
-    if (candidate && typeof candidate.insert === "function") {
-      if (command === "superscript") {
-        candidate.insert("#@^{#?}", {
-          insertionMode: "replaceSelection",
-          selectionMode: "placeholder"
-        });
+    if (candidate) {
+      restoreMathContext(candidate);
+
+      if (command === "superscript" && typeof candidate.executeCommand === "function") {
+        const moved = candidate.executeCommand("moveToSuperscript");
+        if (!moved && typeof candidate.insert === "function") {
+          candidate.insert("^{\\placeholder{}}", { selectionMode: "placeholder" });
+        }
         candidate.focus();
+        rememberMathContext(candidate);
         markDirty();
         scheduleDocumentRefresh(80);
         return;
       }
 
-      if (command === "subscript") {
-        candidate.insert("#@_{#?}", {
-          insertionMode: "replaceSelection",
-          selectionMode: "placeholder"
-        });
+      if (command === "subscript" && typeof candidate.executeCommand === "function") {
+        const moved = candidate.executeCommand("moveToSubscript");
+        if (!moved && typeof candidate.insert === "function") {
+          candidate.insert("_{\\placeholder{}}", { selectionMode: "placeholder" });
+        }
         candidate.focus();
+        rememberMathContext(candidate);
         markDirty();
         scheduleDocumentRefresh(80);
+        return;
+      }
+
+      if (command === "bold" && typeof candidate.applyStyle === "function") {
+        candidate.applyStyle({ fontSeries: "b" }, { operation: "toggle" });
+        candidate.focus();
+        rememberMathContext(candidate);
+        markDirty();
+        return;
+      }
+
+      if (command === "italic" && typeof candidate.applyStyle === "function") {
+        candidate.applyStyle({ fontShape: "it" }, { operation: "toggle" });
+        candidate.focus();
+        rememberMathContext(candidate);
+        markDirty();
         return;
       }
     }
@@ -854,8 +965,13 @@ ${body}
     runCommand(command);
   }
 
-  $("[data-command]").forEach((button) => {
-    button.addEventListener("mousedown", (event) => event.preventDefault());
+  $$("[data-command]").forEach((button) => {
+    button.addEventListener("mousedown", (event) => {
+      const mathTarget = getMathTarget();
+      if (mathTarget) rememberMathContext(mathTarget);
+      else saveSelection();
+      event.preventDefault();
+    });
     button.addEventListener("click", () => runContextAwareCommand(button.dataset.command));
   });
 
