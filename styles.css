@@ -222,8 +222,10 @@ select:focus-visible,
   padding: 0 4px;
   display: inline-grid;
   place-items: center;
-  border-color: transparent;
-  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
   font-family: "Times New Roman", Cambria, serif;
   font-size: 21px;
   line-height: 1;
@@ -231,8 +233,8 @@ select:focus-visible,
 
 .math-tool:hover,
 .math-tool:focus-visible {
-  border-color: var(--line);
-  background: #fff;
+  border-color: #aab8c5;
+  background: #f7f9fb;
 }
 
 .math-tool-wide {
