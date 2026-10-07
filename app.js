@@ -773,14 +773,14 @@ ${body}
   titleInput.addEventListener("input", markDirty);
   authorInput.addEventListener("input", markDirty);
 
-  $("#greekPalette button, #symbolPalette button, .template-grid button, #mathToolbar button").forEach((button) => {
+  $$("#greekPalette button, #symbolPalette button, .template-grid button, #mathToolbar button").forEach((button) => {
     button.addEventListener("mousedown", (event) => {
       saveSelection();
       event.preventDefault();
     });
   });
 
-  $(".template-grid button, #mathToolbar [data-latex]").forEach((button) => {
+  $$(".template-grid button, #mathToolbar [data-latex]").forEach((button) => {
     button.addEventListener("click", () => insertLatex(button.dataset.latex || ""));
   });
 
