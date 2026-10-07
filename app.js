@@ -902,7 +902,7 @@ ${body}
   titleInput.addEventListener("input", markDirty);
   authorInput.addEventListener("input", markDirty);
 
-  $("#greekPalette button, #symbolPalette button, .template-grid button, #mathToolbar button").forEach((button) => {
+  $$("#greekPalette button, #symbolPalette button, .template-grid button, #mathToolbar button").forEach((button) => {
     button.addEventListener("mousedown", (event) => {
       const mathTarget = getMathTarget();
       if (mathTarget) rememberMathContext(mathTarget);
@@ -960,6 +960,21 @@ ${body}
         markDirty();
         return;
       }
+
+      if (command === "underline" && typeof candidate.insert === "function") {
+        const content = candidate.selectionIsCollapsed
+          ? "\\underline{\\placeholder{}}"
+          : "\\underline{#0}";
+        candidate.insert(content, {
+          insertionMode: "replaceSelection",
+          selectionMode: candidate.selectionIsCollapsed ? "placeholder" : "item"
+        });
+        candidate.focus();
+        rememberMathContext(candidate);
+        markDirty();
+        scheduleDocumentRefresh(80);
+        return;
+      }
     }
 
     runCommand(command);
@@ -979,9 +994,29 @@ ${body}
     runCommand("formatBlock", event.target.value);
   });
 
-  $$("[data-menu-action]").forEach((button) => {
+  $("[data-menu-action]").forEach((button) => {
+    button.addEventListener("mousedown", (event) => {
+      const mathTarget = getMathTarget();
+      if (mathTarget) rememberMathContext(mathTarget);
+      event.preventDefault();
+    });
     button.addEventListener("click", () => {
       const action = button.dataset.menuAction;
+      const mathTarget = getMathTarget();
+
+      if (
+        mathTarget &&
+        typeof mathTarget.executeCommand === "function" &&
+        (action === "undo" || action === "redo")
+      ) {
+        restoreMathContext(mathTarget);
+        mathTarget.executeCommand(action);
+        mathTarget.focus();
+        rememberMathContext(mathTarget);
+        scheduleDocumentRefresh(80);
+        return;
+      }
+
       if (action === "undo") runCommand("undo");
       if (action === "redo") runCommand("redo");
     });
@@ -991,7 +1026,7 @@ ${body}
     saveSelection();
     event.preventDefault();
   });
-  $("#inlineMathButton").addEventListener("click", () => createInlineMath("\\placeholder{}"));
+  $("#inlineMathButton").addEventListener("click", () => insertLatex("\\placeholder{}"));
 
   $("#displayMathButton").addEventListener("mousedown", (event) => {
     saveSelection();
