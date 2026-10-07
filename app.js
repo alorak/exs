@@ -380,26 +380,85 @@
     return true;
   }
 
-  function insertLatex(latex) {
-    const candidate = activeMathField && document.contains(activeMathField) ? activeMathField : null;
-    if (candidate && typeof candidate.insert === "function") {
-      candidate.insert(latex, { selectionMode: "placeholder" });
-      candidate.focus();
-      markDirty();
-      return;
-    }
+  function focusMathField(field) {
+    requestAnimationFrame(() => {
+      activeMathField = field;
+      field.focus();
+      if (typeof field.executeCommand === "function") {
+        try {
+          field.executeCommand("moveToNextPlaceholder");
+        } catch {
+          // MathLive versions may expose placeholder navigation differently.
+        }
+      }
+    });
+  }
 
+  function createInlineMath(latex = "\\placeholder{}") {
+    const wrapper = document.createElement("span");
+    wrapper.className = "inline-equation";
+    wrapper.setAttribute("contenteditable", "false");
+
+    const field = document.createElement("math-field");
+    field.setAttribute("smart-fence", "");
+    field.setAttribute("contenteditable", "true");
+    field.setAttribute("virtual-keyboard-mode", "manual");
+    field.textContent = latex;
+
+    wrapper.append(field);
+    insertNodeAtSelection(wrapper);
+    attachMathFieldListeners();
+    focusMathField(field);
+    return field;
+  }
+
+  function createDisplayMath(latex = "\\placeholder{}") {
+    const wrapper = document.createElement("div");
+    wrapper.className = "display-equation";
+    wrapper.setAttribute("contenteditable", "false");
+
+    const center = document.createElement("div");
+    center.className = "equation-center";
+
+    const field = document.createElement("math-field");
+    field.setAttribute("smart-fence", "");
+    field.setAttribute("contenteditable", "true");
+    field.setAttribute("virtual-keyboard-mode", "manual");
+    field.textContent = latex;
+    center.append(field);
+
+    const number = document.createElement("span");
+    number.className = "equation-number";
+    wrapper.append(center, number);
+
+    insertNodeAtSelection(wrapper);
+
+    const paragraph = document.createElement("p");
+    paragraph.innerHTML = "<br>";
+    wrapper.after(paragraph);
+
+    normalizeDocument();
+    focusMathField(field);
+    return field;
+  }
+
+  function insertLatex(latex) {
     if (equationDialog.open && typeof equationEditor.insert === "function") {
       equationEditor.insert(latex, { selectionMode: "placeholder" });
       equationEditor.focus();
       return;
     }
 
-    openEquationDialog("inline");
-    setTimeout(() => {
-      if (typeof equationEditor.insert === "function") equationEditor.insert(latex, { selectionMode: "placeholder" });
-      else setMathValue(equationEditor, latex);
-    }, 60);
+    const candidate = activeMathField && editor.contains(activeMathField) ? activeMathField : null;
+    if (candidate && typeof candidate.insert === "function") {
+      candidate.insert(latex, { selectionMode: "placeholder" });
+      candidate.focus();
+      markDirty();
+      scheduleDocumentRefresh(80);
+      return;
+    }
+
+    createInlineMath(latex);
   }
 
   function insertTable() {
@@ -706,15 +765,22 @@ ${body}
   editor.addEventListener("keyup", saveSelection);
   editor.addEventListener("mouseup", saveSelection);
   editor.addEventListener("focusout", saveSelection);
+  editor.addEventListener("pointerdown", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target?.closest("math-field")) activeMathField = null;
+  });
 
   titleInput.addEventListener("input", markDirty);
   authorInput.addEventListener("input", markDirty);
 
-  $$("#greekPalette button, #symbolPalette button, .template-grid button").forEach((button) => {
-    button.addEventListener("mousedown", (event) => event.preventDefault());
+  $("#greekPalette button, #symbolPalette button, .template-grid button, #mathToolbar button").forEach((button) => {
+    button.addEventListener("mousedown", (event) => {
+      saveSelection();
+      event.preventDefault();
+    });
   });
 
-  $$(".template-grid button").forEach((button) => {
+  $(".template-grid button, #mathToolbar [data-latex]").forEach((button) => {
     button.addEventListener("click", () => insertLatex(button.dataset.latex || ""));
   });
 
@@ -735,10 +801,17 @@ ${body}
     });
   });
 
-  $("#inlineMathButton").addEventListener("mousedown", saveSelection);
-  $("#inlineMathButton").addEventListener("click", () => openEquationDialog("inline"));
-  $("#displayMathButton").addEventListener("mousedown", saveSelection);
-  $("#displayMathButton").addEventListener("click", () => openEquationDialog("display"));
+  $("#inlineMathButton").addEventListener("mousedown", (event) => {
+    saveSelection();
+    event.preventDefault();
+  });
+  $("#inlineMathButton").addEventListener("click", () => createInlineMath("\\placeholder{}"));
+
+  $("#displayMathButton").addEventListener("mousedown", (event) => {
+    saveSelection();
+    event.preventDefault();
+  });
+  $("#displayMathButton").addEventListener("click", () => createDisplayMath("\\placeholder{}"));
 
   $("#equationForm").addEventListener("submit", (event) => {
     if (event.submitter?.value === "cancel") {
