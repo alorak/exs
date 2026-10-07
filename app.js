@@ -26,6 +26,7 @@
   let editingEquation = null;
   let activeMathField = null;
   let saveTimer = null;
+  let uiRefreshTimer = null;
   let toastTimer = null;
 
   const greekSymbols = [
@@ -163,6 +164,13 @@
     updateStats();
   }
 
+  function scheduleDocumentRefresh(delay = 120) {
+    clearTimeout(uiRefreshTimer);
+    uiRefreshTimer = setTimeout(() => {
+      normalizeDocument();
+    }, delay);
+  }
+
   function attachMathFieldListeners() {
     editor.querySelectorAll("math-field").forEach((field) => {
       if (field.dataset.exsBound === "1") return;
@@ -172,7 +180,7 @@
       });
       field.addEventListener("input", () => {
         markDirty();
-        updateStats();
+        scheduleDocumentRefresh(140);
       });
       field.addEventListener("dblclick", (event) => {
         event.stopPropagation();
@@ -691,7 +699,7 @@ ${body}
 
   editor.addEventListener("input", () => {
     saveSelection();
-    normalizeDocument();
+    scheduleDocumentRefresh();
     markDirty();
   });
 
