@@ -9,7 +9,6 @@
 
   const editor = $("#editor");
   const titleInput = $("#documentTitle");
-  const authorInput = $("#authorInput");
   const saveState = $("#saveState");
   const openInput = $("#openInput");
   const imageInput = $("#imageInput");
@@ -85,7 +84,6 @@
       format: "exs-scientific-document",
       version: PROJECT_VERSION,
       title: titleInput.value.trim() || "Adsız bilimsel belge",
-      author: authorInput.value.trim(),
       updatedAt: new Date().toISOString(),
       body: editor.innerHTML
     };
@@ -96,7 +94,6 @@
       throw new Error("Geçerli bir EXS proje dosyası değil.");
     }
     titleInput.value = typeof project.title === "string" ? project.title : "Adsız bilimsel belge";
-    authorInput.value = typeof project.author === "string" ? project.author : "";
     editor.innerHTML = sanitizeImportedHtml(project.body);
     normalizeDocument();
     saveLocal();
@@ -787,7 +784,6 @@ table{width:100%;border-collapse:collapse}th,td{border:1px solid #333;padding:6p
 </head>
 <body>
 <h1>${escapeHtml(titleInput.value)}</h1>
-${authorInput.value ? `<p><em>${escapeHtml(authorInput.value)}</em></p>` : ""}
 ${editor.innerHTML}
 </body></html>`;
     download(`${safeBaseName()}.html`, html, "text/html;charset=utf-8");
@@ -803,7 +799,6 @@ ${editor.innerHTML}
 
   function exportLatex() {
     const body = nodesToLatex(Array.from(editor.childNodes));
-    const author = authorInput.value.trim();
     const tex = `\\documentclass[12pt,a4paper]{article}
 \\usepackage[utf8]{inputenc}
 \\usepackage[T1]{fontenc}
@@ -812,7 +807,6 @@ ${editor.innerHTML}
 \\usepackage{booktabs}
 \\usepackage{hyperref}
 \\title{${escapeLatex(titleInput.value.trim() || "Scientific Document")}}
-${author ? `\\author{${escapeLatex(author)}}` : ""}
 \\date{}
 
 \\begin{document}
@@ -1011,7 +1005,6 @@ ${body}
   });
 
   titleInput.addEventListener("input", markDirty);
-  authorInput.addEventListener("input", markDirty);
 
   $$("#greekPalette button, #symbolPalette button, .template-grid button, #mathToolbar button").forEach((button) => {
     button.addEventListener("mousedown", (event) => {
@@ -1235,6 +1228,15 @@ ${body}
 
   $("#findForm").addEventListener("submit", (event) => event.preventDefault());
 
+  const closeFindDialog = () => {
+    if (findDialog.open) findDialog.close();
+  };
+
+  $("#findCloseButton").addEventListener("click", closeFindDialog);
+
+  findDialog.addEventListener("click", (event) => {
+    if (event.target === findDialog) closeFindDialog();
+  });
   $("#findNextButton").addEventListener("click", (event) => {
     event.preventDefault();
     if (!findText($("#findInput").value)) showToast("Başka eşleşme bulunamadı.");
@@ -1258,13 +1260,6 @@ ${body}
       $("#outlinePanel").hidden = button.dataset.tab !== "outline";
       $("#equationsPanel").hidden = button.dataset.tab !== "equations";
     });
-  });
-
-  $("#zoomRange").addEventListener("input", (event) => {
-    const value = Number(event.target.value);
-    $("#zoomValue").textContent = `${value}%`;
-    $("#page").style.transform = `scale(${value / 100})`;
-    $("#page").style.marginBottom = `${Math.max(0, (value - 100) * 2)}px`;
   });
 
   document.addEventListener("keydown", (event) => {
