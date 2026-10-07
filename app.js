@@ -21,6 +21,9 @@
   const findInput = $("#findInput");
   const findCount = $("#findCount");
   const newDocumentDialog = $("#newDocumentDialog");
+  const editorContextMenu = $("#editorContextMenu");
+  const tableContextActions = $("#tableContextActions");
+  const tableContextSeparator = $("#tableContextSeparator");
   const toast = $("#toast");
 
   let savedRange = null;
@@ -36,6 +39,8 @@
   let searchRanges = [];
   let activeSearchIndex = -1;
   let lastSearchQuery = "";
+  let contextMenuCell = null;
+  let contextMenuRange = null;
 
   const greekSymbols = [
     ["α", "\\alpha"], ["β", "\\beta"], ["γ", "\\gamma"], ["δ", "\\delta"],
@@ -724,6 +729,317 @@
     table.after(paragraph);
   }
 
+  function getCaretRangeFromPoint(x, y) {
+    if (typeof document.caretRangeFromPoint === "function") {
+      return document.caretRangeFromPoint(x, y);
+    }
+
+    if (typeof document.caretPositionFromPoint === "function") {
+      const position = document.caretPositionFromPoint(x, y);
+      if (!position) return null;
+
+      const range = document.createRange();
+      range.setStart(position.offsetNode, position.offset);
+      range.collapse(true);
+      return range;
+    }
+
+    return null;
+  }
+
+  function captureContextMenuRange(event) {
+    const selection = window.getSelection();
+    const pointRange = getCaretRangeFromPoint(event.clientX, event.clientY);
+
+    if (selection?.rangeCount) {
+      const selectedRange = selection.getRangeAt(0);
+      const selectionIsInEditor = editor.contains(selectedRange.commonAncestorContainer);
+
+      if (selectionIsInEditor && !selectedRange.collapsed && pointRange) {
+        let clickedInsideSelection = false;
+        try {
+          clickedInsideSelection = selectedRange.isPointInRange(
+            pointRange.startContainer,
+            pointRange.startOffset
+          );
+        } catch {
+          clickedInsideSelection = false;
+        }
+
+        if (clickedInsideSelection) {
+          contextMenuRange = selectedRange.cloneRange();
+          return;
+        }
+      }
+    }
+
+    if (pointRange && editor.contains(pointRange.commonAncestorContainer)) {
+      contextMenuRange = pointRange.cloneRange();
+      savedRange = pointRange.cloneRange();
+      return;
+    }
+
+    if (selection?.rangeCount) {
+      const currentRange = selection.getRangeAt(0);
+      if (editor.contains(currentRange.commonAncestorContainer)) {
+        contextMenuRange = currentRange.cloneRange();
+      }
+    }
+  }
+
+  function restoreContextMenuRange() {
+    if (!contextMenuRange) return false;
+
+    editor.focus();
+    const selection = window.getSelection();
+    if (!selection) return false;
+
+    selection.removeAllRanges();
+    selection.addRange(contextMenuRange.cloneRange());
+    return true;
+  }
+
+  function hideEditorContextMenu() {
+    editorContextMenu.hidden = true;
+    tableContextActions.hidden = true;
+    tableContextSeparator.hidden = true;
+  }
+
+  function showEditorContextMenu(event, cell = null) {
+    contextMenuCell = cell;
+    captureContextMenuRange(event);
+
+    tableContextActions.hidden = !cell;
+    tableContextSeparator.hidden = !cell;
+    editorContextMenu.hidden = false;
+
+    requestAnimationFrame(() => {
+      const rect = editorContextMenu.getBoundingClientRect();
+      const margin = 8;
+      const left = Math.max(
+        margin,
+        Math.min(event.clientX, window.innerWidth - rect.width - margin)
+      );
+      const top = Math.max(
+        margin,
+        Math.min(event.clientY, window.innerHeight - rect.height - margin)
+      );
+
+      editorContextMenu.style.left = `${left}px`;
+      editorContextMenu.style.top = `${top}px`;
+    });
+  }
+
+  function createEmptyTableCell(tagName = "TD") {
+    const cell = document.createElement(tagName.toLowerCase());
+    cell.innerHTML = "<br>";
+    return cell;
+  }
+
+  function finishTableMutation(targetCell = null) {
+    normalizeDocument();
+    markDirty();
+    scheduleSearchRefresh();
+
+    if (targetCell) {
+      requestAnimationFrame(() => {
+        targetCell.focus();
+        const range = document.createRange();
+        range.selectNodeContents(targetCell);
+        range.collapse(true);
+
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        savedRange = range.cloneRange();
+      });
+    }
+  }
+
+  function addTableRow(direction) {
+    if (!contextMenuCell) return;
+
+    const row = contextMenuCell.closest("tr");
+    if (!row) return;
+
+    const referenceCells = Array.from(row.cells);
+    const newRow = document.createElement("tr");
+
+    referenceCells.forEach((referenceCell) => {
+      newRow.append(createEmptyTableCell(referenceCell.tagName));
+    });
+
+    if (direction === "above") row.before(newRow);
+    else row.after(newRow);
+
+    const targetIndex = Math.min(
+      contextMenuCell.cellIndex,
+      Math.max(newRow.cells.length - 1, 0)
+    );
+    finishTableMutation(newRow.cells[targetIndex] || null);
+  }
+
+  function addTableColumn(direction) {
+    if (!contextMenuCell) return;
+
+    const table = contextMenuCell.closest("table");
+    if (!table) return;
+
+    const targetIndex = contextMenuCell.cellIndex;
+    let focusCell = null;
+
+    Array.from(table.rows).forEach((row) => {
+      const insertionIndex =
+        direction === "left"
+          ? Math.min(targetIndex, row.cells.length)
+          : Math.min(targetIndex + 1, row.cells.length);
+
+      const referenceCell =
+        row.cells[Math.min(targetIndex, Math.max(row.cells.length - 1, 0))] ||
+        row.cells[0] ||
+        null;
+
+      const newCell = createEmptyTableCell(
+        referenceCell?.tagName || (row.rowIndex === 0 ? "TH" : "TD")
+      );
+
+      if (insertionIndex >= row.cells.length) row.append(newCell);
+      else row.insertBefore(newCell, row.cells[insertionIndex]);
+
+      if (row === contextMenuCell.parentElement) focusCell = newCell;
+    });
+
+    finishTableMutation(focusCell);
+  }
+
+  function selectionClipboardPayload() {
+    if (!restoreContextMenuRange()) return null;
+
+    const selection = window.getSelection();
+    if (!selection?.rangeCount || selection.isCollapsed) return null;
+
+    const range = selection.getRangeAt(0);
+    if (!editor.contains(range.commonAncestorContainer)) return null;
+
+    const fragment = range.cloneContents();
+    const container = document.createElement("div");
+    container.append(fragment);
+
+    return {
+      text: selection.toString(),
+      html: container.innerHTML
+    };
+  }
+
+  async function copyEditorSelection() {
+    const payload = selectionClipboardPayload();
+    if (!payload || !payload.text) {
+      showToast("Kopyalamak için önce metin seçin.");
+      return;
+    }
+
+    try {
+      if (
+        navigator.clipboard?.write &&
+        typeof ClipboardItem !== "undefined"
+      ) {
+        const item = new ClipboardItem({
+          "text/plain": new Blob([payload.text], { type: "text/plain" }),
+          "text/html": new Blob([payload.html], { type: "text/html" })
+        });
+        await navigator.clipboard.write([item]);
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(payload.text);
+      } else {
+        restoreContextMenuRange();
+        if (!document.execCommand("copy")) throw new Error("copy-not-supported");
+      }
+      showToast("Kopyalandı.");
+    } catch {
+      restoreContextMenuRange();
+      const copied = document.execCommand("copy");
+      showToast(copied ? "Kopyalandı." : "Pano erişimine izin verilmedi.");
+    }
+  }
+
+  function insertClipboardValue(value, asHtml = false) {
+    if (!restoreContextMenuRange()) return false;
+
+    let inserted = false;
+
+    if (asHtml) {
+      const safeHtml = sanitizeImportedHtml(value);
+      inserted = document.execCommand("insertHTML", false, safeHtml);
+    } else {
+      inserted = document.execCommand("insertText", false, value);
+    }
+
+    if (!inserted) {
+      const selection = window.getSelection();
+      if (!selection?.rangeCount) return false;
+
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+
+      if (asHtml) {
+        const template = document.createElement("template");
+        template.innerHTML = sanitizeImportedHtml(value);
+        const fragment = template.content;
+        const lastNode = fragment.lastChild;
+        range.insertNode(fragment);
+        if (lastNode) range.setStartAfter(lastNode);
+      } else {
+        const textNode = document.createTextNode(value);
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+      }
+
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+
+    saveSelection();
+    normalizeDocument();
+    markDirty();
+    scheduleSearchRefresh();
+    return true;
+  }
+
+  async function pasteFromClipboard(plain = false) {
+    try {
+      if (!plain && navigator.clipboard?.read) {
+        const items = await navigator.clipboard.read();
+
+        for (const item of items) {
+          if (item.types.includes("text/html")) {
+            const blob = await item.getType("text/html");
+            const html = await blob.text();
+            insertClipboardValue(html, true);
+            return;
+          }
+        }
+
+        for (const item of items) {
+          if (item.types.includes("text/plain")) {
+            const blob = await item.getType("text/plain");
+            insertClipboardValue(await blob.text(), false);
+            return;
+          }
+        }
+      }
+
+      if (navigator.clipboard?.readText) {
+        insertClipboardValue(await navigator.clipboard.readText(), false);
+        return;
+      }
+
+      showToast("Bu tarayıcı pano okumayı desteklemiyor.");
+    } catch {
+      showToast("Pano erişimine izin verilmedi. Ctrl/Cmd+V kullanabilirsiniz.");
+    }
+  }
+
   function insertImage(file) {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
@@ -1160,6 +1476,36 @@ ${body}
     if (!target?.closest("math-field")) clearMathContext();
   });
 
+  editor.addEventListener("contextmenu", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target || target.closest("math-field")) return;
+
+    event.preventDefault();
+    closeFindPopover();
+
+    const cell = target.closest("td, th");
+    showEditorContextMenu(event, cell);
+  });
+
+  editorContextMenu.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-context-action]");
+    if (!button) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const action = button.dataset.contextAction;
+    hideEditorContextMenu();
+
+    if (action === "row-above") addTableRow("above");
+    else if (action === "row-below") addTableRow("below");
+    else if (action === "column-left") addTableColumn("left");
+    else if (action === "column-right") addTableColumn("right");
+    else if (action === "copy") await copyEditorSelection();
+    else if (action === "paste") await pasteFromClipboard(false);
+    else if (action === "paste-plain") await pasteFromClipboard(true);
+  });
+
   titleInput.addEventListener("input", markDirty);
 
   $$("#greekPalette button, #symbolPalette button, .template-grid button, #mathToolbar button").forEach((button) => {
@@ -1436,11 +1782,27 @@ ${body}
     showToast(`${count} eşleşme değiştirildi.`);
   });
 
-  document.addEventListener("click", () => {
+  document.addEventListener("click", (event) => {
     if (!findPopover.hidden) closeFindPopover();
+    if (
+      !editorContextMenu.hidden &&
+      !event.target.closest("#editorContextMenu")
+    ) {
+      hideEditorContextMenu();
+    }
   });
 
-  window.addEventListener("resize", positionFindPopover);
+  document.addEventListener("contextmenu", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target || !editor.contains(target)) hideEditorContextMenu();
+  });
+
+  window.addEventListener("resize", () => {
+    positionFindPopover();
+    hideEditorContextMenu();
+  });
+
+  window.addEventListener("scroll", hideEditorContextMenu, true);
 
   $$(".tab-button").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1452,6 +1814,13 @@ ${body}
 
   document.addEventListener("keydown", (event) => {
     const modifier = event.ctrlKey || event.metaKey;
+
+    if (event.key === "Escape" && !editorContextMenu.hidden) {
+      event.preventDefault();
+      hideEditorContextMenu();
+      editor.focus();
+      return;
+    }
 
     if (event.key === "Escape" && !findPopover.hidden) {
       closeFindPopover();

@@ -765,6 +765,68 @@ math-field::part(menu-toggle) {
   color: var(--muted);
 }
 
+.context-menu {
+  position: fixed;
+  z-index: 120;
+  min-width: 190px;
+  padding: 5px;
+  background: #fff;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(26, 40, 54, .18);
+}
+
+.context-menu[hidden] {
+  display: none !important;
+}
+
+.context-menu-section {
+  display: grid;
+  gap: 2px;
+}
+
+.context-menu-section[hidden],
+.context-menu-separator[hidden] {
+  display: none !important;
+}
+
+.context-menu button {
+  width: 100%;
+  min-height: 32px;
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-color: transparent;
+  background: transparent;
+  text-align: left;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.context-menu button:hover,
+.context-menu button:focus-visible {
+  border-color: var(--line);
+  background: #f5f7f9;
+}
+
+.context-menu button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.context-menu-separator {
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--line);
+}
+
 .toast {
   position: fixed;
   z-index: 100;
