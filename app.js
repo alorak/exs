@@ -44,6 +44,8 @@
   let contextMenuCell = null;
   let contextMenuMathField = null;
   let contextMenuRange = null;
+  let tableResizeState = null;
+  let fontSizeMathTarget = null;
 
   const greekSymbols = [
     ["α", "\\alpha"], ["β", "\\beta"], ["γ", "\\gamma"], ["δ", "\\delta"],
@@ -122,7 +124,7 @@
     const allowedTags = new Set([
       "DIV", "SPAN", "P", "BR", "H1", "H2", "H3", "BLOCKQUOTE",
       "B", "STRONG", "I", "EM", "U", "S", "SUP", "SUB",
-      "UL", "OL", "LI", "TABLE", "THEAD", "TBODY", "TR", "TH", "TD",
+      "UL", "OL", "LI", "TABLE", "COLGROUP", "COL", "THEAD", "TBODY", "TR", "TH", "TD",
       "IMG", "A", "MATH-FIELD"
     ]);
 
@@ -142,7 +144,7 @@
         Array.from(child.attributes).forEach((attr) => {
           const name = attr.name.toLowerCase();
           if (name.startsWith("on")) child.removeAttribute(attr.name);
-          if (!["class", "href", "src", "alt", "title", "data-label", "contenteditable", "smart-fence", "math-virtual-keyboard-policy"].includes(name)) {
+          if (!["class", "href", "src", "alt", "title", "data-label", "data-font-size", "data-width", "data-height", "contenteditable", "smart-fence", "math-virtual-keyboard-policy"].includes(name)) {
             child.removeAttribute(attr.name);
           }
         });
@@ -319,7 +321,86 @@
     return wrapper;
   }
 
+  function applyPersistedFontSizes() {
+    editor.querySelectorAll("[data-font-size]").forEach((node) => {
+      const size = Number(node.dataset.fontSize);
+      if (!Number.isFinite(size) || size < 6 || size > 96) {
+        node.removeAttribute("data-font-size");
+        node.style.removeProperty("font-size");
+        return;
+      }
+      node.style.fontSize = `${size}pt`;
+    });
+  }
+
+  function ensureTableColumnModel(table) {
+    const rows = Array.from(table.rows);
+    const columnCount = rows.reduce(
+      (max, row) => Math.max(max, row.cells.length),
+      0
+    );
+    if (!columnCount) return null;
+
+    let colgroup = table.querySelector(":scope > colgroup");
+    if (!colgroup) {
+      colgroup = document.createElement("colgroup");
+      table.prepend(colgroup);
+    }
+
+    while (colgroup.children.length < columnCount) {
+      colgroup.append(document.createElement("col"));
+    }
+    while (colgroup.children.length > columnCount) {
+      colgroup.lastElementChild?.remove();
+    }
+
+    const cols = Array.from(colgroup.children);
+    const hasStoredWidths = cols.every((col) => {
+      const value = Number(col.dataset.width);
+      return Number.isFinite(value) && value > 0;
+    });
+
+    if (!hasStoredWidths) {
+      const equalWidth = 100 / columnCount;
+      cols.forEach((col) => {
+        col.dataset.width = String(equalWidth);
+      });
+    }
+
+    const total = cols.reduce(
+      (sum, col) => sum + (Number(col.dataset.width) || 0),
+      0
+    );
+
+    if (total > 0) {
+      cols.forEach((col) => {
+        const normalized = ((Number(col.dataset.width) || 0) / total) * 100;
+        col.dataset.width = String(normalized);
+        col.style.width = `${normalized}%`;
+      });
+    }
+
+    return { colgroup, cols, columnCount };
+  }
+
+  function applyPersistedTableDimensions() {
+    editor.querySelectorAll("table").forEach((table) => {
+      ensureTableColumnModel(table);
+
+      Array.from(table.rows).forEach((row) => {
+        const height = Number(row.dataset.height);
+        if (Number.isFinite(height) && height >= 24) {
+          row.style.height = `${height}px`;
+        } else {
+          row.style.removeProperty("height");
+        }
+      });
+    });
+  }
+
   function normalizeDocument() {
+    applyPersistedFontSizes();
+    applyPersistedTableDimensions();
     attachMathFieldListeners();
     renumberEquations();
     updateOutline();
@@ -681,6 +762,56 @@
     createInlineMath(latex);
   }
 
+  function convertBrowserFontSize(size) {
+    editor.querySelectorAll('font[size="7"]').forEach((font) => {
+      const span = document.createElement("span");
+      span.dataset.fontSize = String(size);
+      span.style.fontSize = `${size}pt`;
+      while (font.firstChild) span.append(font.firstChild);
+      font.replaceWith(span);
+    });
+  }
+
+  function applyFontSize(size, explicitMathTarget = null) {
+    const numericSize = Number(size);
+    if (!Number.isFinite(numericSize)) return;
+
+    const mathTarget =
+      explicitMathTarget && explicitMathTarget.isConnected
+        ? explicitMathTarget
+        : getMathTarget();
+    if (mathTarget && editor.contains(mathTarget)) {
+      mathTarget.dataset.fontSize = String(numericSize);
+      mathTarget.style.fontSize = `${numericSize}pt`;
+      markDirty();
+      return;
+    }
+
+    restoreSelection();
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
+    if (!editor.contains(range.commonAncestorContainer)) return;
+
+    if (!range.collapsed) {
+      document.execCommand("fontSize", false, "7");
+      convertBrowserFontSize(numericSize);
+    } else {
+      const node = range.startContainer;
+      const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+      const block = element?.closest("p,h1,h2,h3,blockquote,li,td,th") || editor;
+      if (block !== editor) {
+        block.dataset.fontSize = String(numericSize);
+        block.style.fontSize = `${numericSize}pt`;
+      }
+    }
+
+    saveSelection();
+    normalizeDocument();
+    markDirty();
+  }
+
   function insertTable() {
     const table = document.createElement("table");
     const tbody = document.createElement("tbody");
@@ -698,6 +829,191 @@
     const paragraph = document.createElement("p");
     paragraph.innerHTML = "<br>";
     table.after(paragraph);
+  }
+
+  function clearTableResizeCursor() {
+    editor.classList.remove(
+      "table-resize-col",
+      "table-resize-row",
+      "table-resizing"
+    );
+  }
+
+  function getTableResizeTarget(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    const cell = target?.closest("td, th");
+    if (!cell || !editor.contains(cell)) return null;
+
+    const table = cell.closest("table");
+    const row = cell.closest("tr");
+    if (!table || !row) return null;
+
+    const model = ensureTableColumnModel(table);
+    if (!model) return null;
+
+    const cellRect = cell.getBoundingClientRect();
+    const threshold = 6;
+    const leftDistance = Math.abs(event.clientX - cellRect.left);
+    const rightDistance = Math.abs(event.clientX - cellRect.right);
+    const topDistance = Math.abs(event.clientY - cellRect.top);
+    const bottomDistance = Math.abs(event.clientY - cellRect.bottom);
+
+    const rowIndex = Array.from(table.rows).indexOf(row);
+    const colIndex = cell.cellIndex;
+
+    const verticalCandidates = [];
+    if (colIndex > 0 && leftDistance <= threshold) {
+      verticalCandidates.push({
+        axis: "col",
+        boundaryIndex: colIndex - 1,
+        distance: leftDistance,
+        table
+      });
+    }
+    if (colIndex < model.columnCount - 1 && rightDistance <= threshold) {
+      verticalCandidates.push({
+        axis: "col",
+        boundaryIndex: colIndex,
+        distance: rightDistance,
+        table
+      });
+    }
+
+    const horizontalCandidates = [];
+    if (rowIndex > 0 && topDistance <= threshold) {
+      horizontalCandidates.push({
+        axis: "row",
+        boundaryIndex: rowIndex - 1,
+        distance: topDistance,
+        table
+      });
+    }
+    if (rowIndex < table.rows.length - 1 && bottomDistance <= threshold) {
+      horizontalCandidates.push({
+        axis: "row",
+        boundaryIndex: rowIndex,
+        distance: bottomDistance,
+        table
+      });
+    }
+
+    const candidates = [...verticalCandidates, ...horizontalCandidates];
+    if (!candidates.length) return null;
+
+    candidates.sort((a, b) => a.distance - b.distance);
+    return candidates[0];
+  }
+
+  function updateTableResizeCursor(event) {
+    if (tableResizeState) return;
+
+    const target = getTableResizeTarget(event);
+    editor.classList.remove("table-resize-col", "table-resize-row");
+
+    if (target?.axis === "col") editor.classList.add("table-resize-col");
+    else if (target?.axis === "row") editor.classList.add("table-resize-row");
+  }
+
+  function beginTableResize(event) {
+    if (event.button !== 0) return false;
+
+    const target = getTableResizeTarget(event);
+    if (!target) return false;
+
+    const table = target.table;
+    const model = ensureTableColumnModel(table);
+    if (!model) return false;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (target.axis === "col") {
+      const leftCol = model.cols[target.boundaryIndex];
+      const rightCol = model.cols[target.boundaryIndex + 1];
+      if (!leftCol || !rightCol) return false;
+
+      const leftWidth = Number(leftCol.dataset.width) || 0;
+      const rightWidth = Number(rightCol.dataset.width) || 0;
+
+      tableResizeState = {
+        axis: "col",
+        table,
+        boundaryIndex: target.boundaryIndex,
+        startX: event.clientX,
+        tableWidth: Math.max(table.getBoundingClientRect().width, 1),
+        leftCol,
+        rightCol,
+        leftWidth,
+        rightWidth
+      };
+      editor.classList.add("table-resize-col", "table-resizing");
+    } else {
+      const row = table.rows[target.boundaryIndex];
+      if (!row) return false;
+
+      tableResizeState = {
+        axis: "row",
+        table,
+        boundaryIndex: target.boundaryIndex,
+        startY: event.clientY,
+        row,
+        startHeight: row.getBoundingClientRect().height
+      };
+      editor.classList.add("table-resize-row", "table-resizing");
+    }
+
+    return true;
+  }
+
+  function continueTableResize(event) {
+    if (!tableResizeState) return;
+
+    event.preventDefault();
+
+    if (tableResizeState.axis === "col") {
+      const {
+        startX,
+        tableWidth,
+        leftCol,
+        rightCol,
+        leftWidth,
+        rightWidth
+      } = tableResizeState;
+
+      const combined = leftWidth + rightWidth;
+      const minimumPercent = Math.min(
+        combined / 2,
+        (44 / tableWidth) * 100
+      );
+      const deltaPercent = ((event.clientX - startX) / tableWidth) * 100;
+      const newLeft = Math.max(
+        minimumPercent,
+        Math.min(combined - minimumPercent, leftWidth + deltaPercent)
+      );
+      const newRight = combined - newLeft;
+
+      leftCol.dataset.width = String(newLeft);
+      rightCol.dataset.width = String(newRight);
+      leftCol.style.width = `${newLeft}%`;
+      rightCol.style.width = `${newRight}%`;
+    } else {
+      const { startY, row, startHeight } = tableResizeState;
+      const newHeight = Math.max(24, startHeight + (event.clientY - startY));
+      row.dataset.height = String(newHeight);
+      row.style.height = `${newHeight}px`;
+    }
+  }
+
+  function finishTableResize() {
+    if (!tableResizeState) {
+      clearTableResizeCursor();
+      return;
+    }
+
+    tableResizeState = null;
+    clearTableResizeCursor();
+    markDirty();
+    scheduleSearchRefresh();
   }
 
   function getCaretRangeFromPoint(x, y) {
@@ -1526,10 +1842,22 @@ ${body}
   editor.addEventListener("keyup", saveSelection);
   editor.addEventListener("mouseup", saveSelection);
   editor.addEventListener("focusout", saveSelection);
+  editor.addEventListener("pointermove", updateTableResizeCursor);
+
+  editor.addEventListener("pointerleave", () => {
+    if (!tableResizeState) clearTableResizeCursor();
+  });
+
   editor.addEventListener("pointerdown", (event) => {
+    if (beginTableResize(event)) return;
+
     const target = event.target instanceof Element ? event.target : null;
     if (!target?.closest("math-field")) clearMathContext();
   });
+
+  document.addEventListener("pointermove", continueTableResize);
+  document.addEventListener("pointerup", finishTableResize);
+  document.addEventListener("pointercancel", finishTableResize);
 
   editor.addEventListener("contextmenu", (event) => {
     const target = event.target instanceof Element ? event.target : null;
@@ -1672,6 +2000,26 @@ ${body}
 
   $("#blockStyle").addEventListener("change", (event) => {
     runCommand("formatBlock", event.target.value);
+  });
+
+  $("#fontSizeSelect").addEventListener("pointerdown", () => {
+    const focused = document.activeElement;
+    if (
+      focused &&
+      focused.tagName === "MATH-FIELD" &&
+      editor.contains(focused)
+    ) {
+      fontSizeMathTarget = focused;
+      rememberMathContext(focused);
+    } else {
+      fontSizeMathTarget = null;
+      saveSelection();
+    }
+  });
+
+  $("#fontSizeSelect").addEventListener("change", (event) => {
+    applyFontSize(event.target.value, fontSizeMathTarget);
+    fontSizeMathTarget = null;
   });
 
   $$("[data-menu-action]").forEach((button) => {

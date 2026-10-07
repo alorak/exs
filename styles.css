@@ -207,6 +207,11 @@ select:focus-visible,
   border-radius: 6px;
 }
 
+.font-size-select {
+  width: 76px;
+  flex: 0 0 auto;
+}
+
 .menu-separator {
   width: 1px;
   height: 24px;
@@ -576,13 +581,34 @@ select:focus-visible,
   color: #46525f;
 }
 
-.editor table { width: 100%; border-collapse: collapse; margin: 14pt 0; }
+.editor table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin: 14pt 0;
+}
 
 .editor th, .editor td {
   min-width: 45px;
   border: 1px solid #333;
   padding: 5px 7px;
   vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.editor.table-resize-col,
+.editor.table-resize-col * {
+  cursor: col-resize !important;
+}
+
+.editor.table-resize-row,
+.editor.table-resize-row * {
+  cursor: row-resize !important;
+}
+
+.editor.table-resizing,
+.editor.table-resizing * {
+  user-select: none !important;
 }
 
 .editor img {
