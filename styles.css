@@ -423,6 +423,11 @@ math-field:focus {
   background: #fbfdff;
 }
 
+/* EXS uses its own math toolbar; MathLive's on-screen keyboard is intentionally disabled. */
+math-field::part(virtual-keyboard-toggle) {
+  display: none !important;
+}
+
 .tool-section { padding: 12px; border-bottom: 1px solid var(--line); }
 
 .tool-section h3 {

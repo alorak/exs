@@ -128,7 +128,7 @@
         Array.from(child.attributes).forEach((attr) => {
           const name = attr.name.toLowerCase();
           if (name.startsWith("on")) child.removeAttribute(attr.name);
-          if (!["class", "href", "src", "alt", "title", "data-label", "contenteditable", "smart-fence"].includes(name)) {
+          if (!["class", "href", "src", "alt", "title", "data-label", "contenteditable", "smart-fence", "math-virtual-keyboard-policy"].includes(name)) {
             child.removeAttribute(attr.name);
           }
         });
@@ -157,6 +157,38 @@
     return root.innerHTML;
   }
 
+  function hideMathVirtualKeyboard() {
+    const keyboard = window.mathVirtualKeyboard;
+    if (!keyboard) return;
+
+    try {
+      if (typeof keyboard.hide === "function") keyboard.hide();
+      else if ("visible" in keyboard) keyboard.visible = false;
+    } catch {
+      // MathLive may not have initialized its shared keyboard yet.
+    }
+  }
+
+  function configureMathField(field) {
+    if (!field) return;
+
+    field.removeAttribute("virtual-keyboard-mode");
+    field.setAttribute("math-virtual-keyboard-policy", "manual");
+
+    // If the custom element has already been upgraded, also set the property.
+    try {
+      if ("mathVirtualKeyboardPolicy" in field) field.mathVirtualKeyboardPolicy = "manual";
+    } catch {
+      // The attribute above remains the source of truth before upgrade.
+    }
+
+    if (field.dataset.exsKeyboardDisabled !== "1") {
+      field.dataset.exsKeyboardDisabled = "1";
+      field.addEventListener("focusin", hideMathVirtualKeyboard);
+      field.addEventListener("pointerdown", hideMathVirtualKeyboard);
+    }
+  }
+
   function normalizeDocument() {
     attachMathFieldListeners();
     renumberEquations();
@@ -173,10 +205,12 @@
 
   function attachMathFieldListeners() {
     editor.querySelectorAll("math-field").forEach((field) => {
+      configureMathField(field);
       if (field.dataset.exsBound === "1") return;
       field.dataset.exsBound = "1";
       field.addEventListener("focus", () => {
         activeMathField = field;
+        hideMathVirtualKeyboard();
       });
       field.addEventListener("input", () => {
         markDirty();
@@ -402,7 +436,7 @@
     const field = document.createElement("math-field");
     field.setAttribute("smart-fence", "");
     field.setAttribute("contenteditable", "true");
-    field.setAttribute("virtual-keyboard-mode", "manual");
+    field.setAttribute("math-virtual-keyboard-policy", "manual");
     field.textContent = latex;
 
     wrapper.append(field);
@@ -423,7 +457,7 @@
     const field = document.createElement("math-field");
     field.setAttribute("smart-fence", "");
     field.setAttribute("contenteditable", "true");
-    field.setAttribute("virtual-keyboard-mode", "manual");
+    field.setAttribute("math-virtual-keyboard-policy", "manual");
     field.textContent = latex;
     center.append(field);
 
@@ -784,9 +818,39 @@ ${body}
     button.addEventListener("click", () => insertLatex(button.dataset.latex || ""));
   });
 
-  $$("[data-command]").forEach((button) => {
+  function runContextAwareCommand(command) {
+    const candidate = activeMathField && editor.contains(activeMathField) ? activeMathField : null;
+
+    if (candidate && typeof candidate.insert === "function") {
+      if (command === "superscript") {
+        candidate.insert("#@^{#?}", {
+          insertionMode: "replaceSelection",
+          selectionMode: "placeholder"
+        });
+        candidate.focus();
+        markDirty();
+        scheduleDocumentRefresh(80);
+        return;
+      }
+
+      if (command === "subscript") {
+        candidate.insert("#@_{#?}", {
+          insertionMode: "replaceSelection",
+          selectionMode: "placeholder"
+        });
+        candidate.focus();
+        markDirty();
+        scheduleDocumentRefresh(80);
+        return;
+      }
+    }
+
+    runCommand(command);
+  }
+
+  $("[data-command]").forEach((button) => {
     button.addEventListener("mousedown", (event) => event.preventDefault());
-    button.addEventListener("click", () => runCommand(button.dataset.command));
+    button.addEventListener("click", () => runContextAwareCommand(button.dataset.command));
   });
 
   $("#blockStyle").addEventListener("change", (event) => {
@@ -945,8 +1009,10 @@ ${body}
 
   window.addEventListener("beforeunload", saveLocal);
   window.addEventListener("load", () => {
+    configureMathField(equationEditor);
     attachMathFieldListeners();
     normalizeDocument();
+    hideMathVirtualKeyboard();
     saveLocal();
   });
 })();
