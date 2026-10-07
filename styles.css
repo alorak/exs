@@ -301,6 +301,116 @@ select:focus-visible,
 
 .popover button { width: 100%; border: 0; text-align: left; padding: 8px 10px; }
 
+.find-popover {
+  position: fixed;
+  z-index: 90;
+  width: min(430px, calc(100vw - 20px));
+  transform-origin: top right;
+  animation: find-popover-in 120ms ease-out;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  box-shadow: 0 12px 30px rgba(26, 40, 54, .16);
+}
+
+.find-popover[hidden] {
+  display: none !important;
+}
+
+@keyframes find-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.find-row,
+.replace-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.replace-row {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid var(--line);
+}
+
+.find-input {
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 9px;
+  background: #fff;
+  color: var(--text);
+}
+
+.find-input:focus {
+  border-color: #8eb8e3;
+  outline: 1px solid #b7d2eb;
+}
+
+.find-count {
+  min-width: 46px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.find-nav-button {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: #40505e;
+}
+
+.find-nav-button:hover,
+.find-nav-button:focus-visible {
+  border-color: var(--line);
+  background: #f5f7f9;
+}
+
+.find-nav-button svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.compact-button {
+  height: 30px;
+  padding: 0 9px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+::highlight(exs-search) {
+  background: #fff1a8;
+  color: inherit;
+}
+
+::highlight(exs-search-active) {
+  background: #ffd56a;
+  color: inherit;
+}
+
 .app-shell {
   min-width: 0;
   min-height: 0;
