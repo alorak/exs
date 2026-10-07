@@ -109,10 +109,29 @@
 
     <span class="menu-separator"></span>
 
-    <button id="findButton" class="toolbar-icon" title="Bul / değiştir (Ctrl/Cmd+F)" aria-label="Bul ve değiştir">
+    <button id="findButton" class="toolbar-icon" title="Bul / değiştir (Ctrl/Cmd+F)" aria-label="Bul ve değiştir" aria-expanded="false" aria-controls="findPopover">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>
     </button>
   </nav>
+
+  <div id="findPopover" class="find-popover" hidden>
+    <div class="find-row">
+      <input id="findInput" class="find-input" type="search" placeholder="Ara…" autocomplete="off" aria-label="Belgede ara" />
+      <span id="findCount" class="find-count">0 / 0</span>
+      <button id="findPrevButton" class="find-nav-button" type="button" title="Önceki eşleşme" aria-label="Önceki eşleşme">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg>
+      </button>
+      <button id="findNextButton" class="find-nav-button" type="button" title="Sonraki eşleşme" aria-label="Sonraki eşleşme">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 10 6 6 6-6"/></svg>
+      </button>
+      <button id="findCloseButton" class="find-nav-button" type="button" title="Aramayı kapat" aria-label="Aramayı kapat">×</button>
+    </div>
+    <div class="replace-row">
+      <input id="replaceInput" class="find-input" type="text" placeholder="Şununla değiştir…" aria-label="Değiştirilecek metin" />
+      <button id="replaceButton" type="button" class="ghost-button compact-button">Değiştir</button>
+      <button id="replaceAllButton" type="button" class="ghost-button compact-button">Tümü</button>
+    </div>
+  </div>
 
   <main class="app-shell">
     <aside class="left-sidebar panel">
@@ -175,6 +194,22 @@
     <span>Yerel otomatik kayıt açık</span>
   </footer>
 
+  <dialog id="newDocumentDialog" class="dialog small-dialog">
+    <div class="dialog-card confirm-card">
+      <header>
+        <div>
+          <h2>Yeni belge oluşturulsun mu?</h2>
+          <p>Mevcut çalışma alanı sıfırlanacak. Son durum tarayıcıda otomatik kaydedilmiş olabilir.</p>
+        </div>
+        <button id="newDocumentCloseButton" type="button" class="icon-button" aria-label="Kapat" title="Kapat">×</button>
+      </header>
+      <footer>
+        <button id="newDocumentCancelButton" type="button" class="ghost-button">İptal</button>
+        <button id="newDocumentConfirmButton" type="button" class="primary-button">Yeni belge oluştur</button>
+      </footer>
+    </div>
+  </dialog>
+
   <dialog id="equationDialog" class="dialog">
     <form method="dialog" class="dialog-card" id="equationForm">
       <header>
@@ -203,30 +238,7 @@
     </form>
   </dialog>
 
-  <dialog id="findDialog" class="dialog small-dialog">
-    <form method="dialog" class="dialog-card" id="findForm">
-      <header>
-        <div>
-          <h2>Bul ve değiştir</h2>
-          <p>Metin içeriğinde arama yapar.</p>
-        </div>
-        <button id="findCloseButton" type="button" class="icon-button" aria-label="Kapat" title="Kapat">×</button>
-      </header>
-      <label>
-        <span>Bul</span>
-        <input id="findInput" class="text-input" />
-      </label>
-      <label>
-        <span>Şununla değiştir</span>
-        <input id="replaceInput" class="text-input" />
-      </label>
-      <footer>
-        <button id="findNextButton" value="noop" class="ghost-button">Sonrakini bul</button>
-        <button id="replaceButton" value="noop" class="ghost-button">Değiştir</button>
-        <button id="replaceAllButton" value="noop" class="primary-button">Tümünü değiştir</button>
-      </footer>
-    </form>
-  </dialog>
+
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <script src="./app.js"></script>
