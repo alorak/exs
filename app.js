@@ -1452,6 +1452,13 @@ ${body}
 
   document.addEventListener("keydown", (event) => {
     const modifier = event.ctrlKey || event.metaKey;
+
+    if (event.key === "Escape" && !findPopover.hidden) {
+      closeFindPopover();
+      $("#findButton").focus();
+      return;
+    }
+
     if (modifier && event.key.toLowerCase() === "s") {
       event.preventDefault();
       exportProject();
