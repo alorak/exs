@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <meta name="description" content="EXS — tarayıcıda çalışan bilimsel WYSIWYG belge ve matematik editörü." />
+  <title>EXS — Scientific Editor</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/mathlive"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-mark">∑</div>
+      <div>
+        <strong>EXS</strong>
+        <span>Scientific Editor</span>
+      </div>
+    </div>
+
+    <div class="document-title-wrap">
+      <input id="documentTitle" class="document-title" value="Adsız bilimsel belge" aria-label="Belge adı" />
+      <span id="saveState" class="save-state">Kaydedildi</span>
+    </div>
+
+    <div class="header-actions">
+      <button id="newButton" class="ghost-button">Yeni</button>
+      <button id="openButton" class="ghost-button">Aç</button>
+      <button id="saveButton" class="primary-button">Kaydet</button>
+      <input id="openInput" type="file" accept=".exs,.json,application/json" hidden />
+    </div>
+  </header>
+
+  <nav class="menu-bar" aria-label="Ana menü">
+    <button data-menu-action="undo" title="Geri al (Ctrl/Cmd+Z)">Geri al</button>
+    <button data-menu-action="redo" title="Yinele (Ctrl/Cmd+Y)">Yinele</button>
+    <span class="menu-separator"></span>
+
+    <select id="blockStyle" title="Paragraf stili">
+      <option value="p">Normal</option>
+      <option value="h1">Başlık 1</option>
+      <option value="h2">Başlık 2</option>
+      <option value="h3">Başlık 3</option>
+      <option value="blockquote">Alıntı</option>
+    </select>
+
+    <button data-command="bold" title="Kalın (Ctrl/Cmd+B)"><b>B</b></button>
+    <button data-command="italic" title="İtalik (Ctrl/Cmd+I)"><i>I</i></button>
+    <button data-command="underline" title="Altı çizili"><u>U</u></button>
+    <button data-command="superscript" title="Üst simge">x²</button>
+    <button data-command="subscript" title="Alt simge">x₂</button>
+
+    <span class="menu-separator"></span>
+
+    <button id="inlineMathButton" title="Satır içi matematik">Inline ∑</button>
+    <button id="displayMathButton" title="Numaralı denklem">Denklem</button>
+    <button id="tableButton" title="3×3 tablo ekle">Tablo</button>
+    <button id="imageButton" title="Görsel ekle">Görsel</button>
+    <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" hidden />
+
+    <span class="menu-separator"></span>
+
+    <button id="findButton" title="Bul / değiştir (Ctrl/Cmd+F)">Bul</button>
+    <button id="printButton">Yazdır / PDF</button>
+
+    <div class="export-menu">
+      <button id="exportButton">Dışa aktar ▾</button>
+      <div id="exportPopover" class="popover" hidden>
+        <button data-export="latex">LaTeX (.tex)</button>
+        <button data-export="html">HTML (.html)</button>
+        <button data-export="text">Düz metin (.txt)</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="app-shell">
+    <aside class="left-sidebar panel">
+      <div class="panel-heading">
+        <strong>Belge</strong>
+      </div>
+      <div class="sidebar-tabs" role="tablist">
+        <button class="tab-button active" data-tab="outline">İçindekiler</button>
+        <button class="tab-button" data-tab="equations">Denklemler</button>
+      </div>
+      <div id="outlinePanel" class="side-content"></div>
+      <div id="equationsPanel" class="side-content" hidden></div>
+    </aside>
+
+    <section class="workspace" aria-label="Belge çalışma alanı">
+      <div id="page" class="page">
+        <article id="editor" class="editor" contenteditable="true" spellcheck="true" aria-label="Bilimsel belge editörü"></article>
+      </div>
+    </section>
+
+    <aside class="right-sidebar panel">
+      <div class="panel-heading">
+        <strong>Bilimsel araçlar</strong>
+      </div>
+
+      <section class="tool-section">
+        <h3>Matematik yapıları</h3>
+        <div class="template-grid">
+          <button data-latex="\frac{\placeholder{a}}{\placeholder{b}}">a/b</button>
+          <button data-latex="\sqrt{\placeholder{x}}">√x</button>
+          <button data-latex="\placeholder{x}^{\placeholder{n}}">xⁿ</button>
+          <button data-latex="\sum_{i=1}^{n}\placeholder{x_i}">Σ</button>
+          <button data-latex="\int_{\placeholder{a}}^{\placeholder{b}}\placeholder{f(x)}\,dx">∫</button>
+          <button data-latex="\lim_{x\to\placeholder{a}}\placeholder{f(x)}">lim</button>
+          <button data-latex="\frac{\partial \placeholder{f}}{\partial \placeholder{x}}">∂</button>
+          <button data-latex="\begin{bmatrix}a&b\\c&d\end{bmatrix}">[ ]</button>
+        </div>
+      </section>
+
+      <section class="tool-section">
+        <h3>Yunan harfleri</h3>
+        <div id="greekPalette" class="symbol-grid"></div>
+      </section>
+
+      <section class="tool-section">
+        <h3>Semboller</h3>
+        <div id="symbolPalette" class="symbol-grid"></div>
+      </section>
+
+      <section class="tool-section">
+        <h3>Belge ayarları</h3>
+        <label class="field-label" for="authorInput">Yazar</label>
+        <input id="authorInput" class="text-input" placeholder="Yazar / araştırmacı" />
+        <label class="field-label" for="zoomRange">Yakınlaştırma <span id="zoomValue">100%</span></label>
+        <input id="zoomRange" type="range" min="70" max="140" value="100" step="5" />
+      </section>
+    </aside>
+  </main>
+
+  <footer class="status-bar">
+    <span id="wordCount">0 kelime</span>
+    <span id="charCount">0 karakter</span>
+    <span id="equationCount">0 denklem</span>
+    <span class="status-spacer"></span>
+    <span>Yerel otomatik kayıt açık</span>
+  </footer>
+
+  <dialog id="equationDialog" class="dialog">
+    <form method="dialog" class="dialog-card" id="equationForm">
+      <header>
+        <div>
+          <h2 id="equationDialogTitle">Denklem ekle</h2>
+          <p>LaTeX yazın veya sağdaki bilimsel paleti kullanın.</p>
+        </div>
+        <button value="cancel" class="icon-button" aria-label="Kapat">×</button>
+      </header>
+
+      <div class="equation-editor-wrap">
+        <math-field id="equationEditor" smart-fence virtual-keyboard-mode="manual" aria-label="Denklem editörü"></math-field>
+      </div>
+
+      <div class="dialog-fields" id="displayEquationFields">
+        <label>
+          <span>Etiket (opsiyonel)</span>
+          <input id="equationLabel" class="text-input" placeholder="örn. schrodinger" />
+        </label>
+      </div>
+
+      <footer>
+        <button value="cancel" class="ghost-button">İptal</button>
+        <button id="equationInsertButton" value="default" class="primary-button">Ekle</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="findDialog" class="dialog small-dialog">
+    <form method="dialog" class="dialog-card" id="findForm">
+      <header>
+        <div>
+          <h2>Bul ve değiştir</h2>
+          <p>Metin içeriğinde arama yapar.</p>
+        </div>
+        <button value="cancel" class="icon-button" aria-label="Kapat">×</button>
+      </header>
+      <label>
+        <span>Bul</span>
+        <input id="findInput" class="text-input" />
+      </label>
+      <label>
+        <span>Şununla değiştir</span>
+        <input id="replaceInput" class="text-input" />
+      </label>
+      <footer>
+        <button id="findNextButton" value="noop" class="ghost-button">Sonrakini bul</button>
+        <button id="replaceButton" value="noop" class="ghost-button">Değiştir</button>
+        <button id="replaceAllButton" value="noop" class="primary-button">Tümünü değiştir</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="./app.js"></script>
+</body>
+</html>
