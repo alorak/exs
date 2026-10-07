@@ -303,17 +303,6 @@
     return node.nodeType === Node.TEXT_NODE && !(node.textContent || "").trim();
   }
 
-  function isStandaloneInlineEquation(wrapper) {
-    const parent = wrapper?.parentElement;
-    if (!parent || parent.tagName !== "P") return false;
-
-    return Array.from(parent.childNodes).every((node) => {
-      if (node === wrapper) return true;
-      if (isWhitespaceTextNode(node)) return true;
-      return node.nodeType === Node.ELEMENT_NODE && node.tagName === "BR";
-    });
-  }
-
   function buildDisplayEquationFromField(field) {
     const wrapper = document.createElement("div");
     wrapper.className = "display-equation";
@@ -328,20 +317,6 @@
 
     wrapper.append(center, number);
     return wrapper;
-  }
-
-  function promoteStandaloneInlineMath() {
-    const standalone = Array.from(editor.querySelectorAll(".inline-equation"))
-      .filter(isStandaloneInlineEquation);
-
-    standalone.forEach((inlineWrapper) => {
-      const parent = inlineWrapper.parentElement;
-      const field = inlineWrapper.querySelector("math-field");
-      if (!parent || !field) return;
-
-      const display = buildDisplayEquationFromField(field);
-      parent.replaceWith(display);
-    });
   }
 
   function normalizeDocument() {
