@@ -17,7 +17,10 @@
   const equationLabel = $("#equationLabel");
   const equationDialogTitle = $("#equationDialogTitle");
   const displayEquationFields = $("#displayEquationFields");
-  const findDialog = $("#findDialog");
+  const findPopover = $("#findPopover");
+  const findInput = $("#findInput");
+  const findCount = $("#findCount");
+  const newDocumentDialog = $("#newDocumentDialog");
   const toast = $("#toast");
 
   let savedRange = null;
@@ -28,7 +31,11 @@
   let activeMathPosition = null;
   let saveTimer = null;
   let uiRefreshTimer = null;
+  let searchRefreshTimer = null;
   let toastTimer = null;
+  let searchRanges = [];
+  let activeSearchIndex = -1;
+  let lastSearchQuery = "";
 
   const greekSymbols = [
     ["α", "\\alpha"], ["β", "\\beta"], ["γ", "\\gamma"], ["δ", "\\delta"],
@@ -927,50 +934,198 @@ ${body}
     updateOutline();
   }
 
-  function findText(query) {
-    if (!query) return false;
-    if (window.find) return window.find(query, false, false, true, false, false, false);
-    return false;
+  function clearSearchHighlights() {
+    if ("highlights" in CSS) {
+      CSS.highlights.delete("exs-search");
+      CSS.highlights.delete("exs-search-active");
+    }
   }
 
-  function replaceCurrent(find, replacement) {
-    const selection = window.getSelection();
-    if (!selection || selection.toString() !== find) {
-      if (!findText(find)) return false;
+  function collectSearchRanges(query) {
+    const needle = query.trim().toLocaleLowerCase("tr-TR");
+    if (!needle) return [];
+
+    const ranges = [];
+    const walker = document.createTreeWalker(
+      editor,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode(node) {
+          const parent = node.parentElement;
+          if (!parent) return NodeFilter.FILTER_REJECT;
+          if (parent.closest("math-field")) return NodeFilter.FILTER_REJECT;
+          if (parent.closest(".equation-number")) return NodeFilter.FILTER_REJECT;
+          return (node.nodeValue || "").trim()
+            ? NodeFilter.FILTER_ACCEPT
+            : NodeFilter.FILTER_REJECT;
+        }
+      }
+    );
+
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      const text = node.nodeValue || "";
+      const haystack = text.toLocaleLowerCase("tr-TR");
+      let from = 0;
+
+      while (from <= haystack.length - needle.length) {
+        const index = haystack.indexOf(needle, from);
+        if (index < 0) break;
+
+        const range = document.createRange();
+        range.setStart(node, index);
+        range.setEnd(node, index + needle.length);
+        ranges.push(range);
+
+        from = index + Math.max(needle.length, 1);
+      }
     }
-    const activeSelection = window.getSelection();
-    if (!activeSelection || !activeSelection.rangeCount) return false;
-    const range = activeSelection.getRangeAt(0);
-    if (!editor.contains(range.commonAncestorContainer)) return false;
+
+    return ranges;
+  }
+
+  function renderSearchHighlights() {
+    clearSearchHighlights();
+
+    if (
+      !searchRanges.length ||
+      !("highlights" in CSS) ||
+      typeof Highlight === "undefined"
+    ) {
+      return;
+    }
+
+    const passive = searchRanges.filter((_, index) => index !== activeSearchIndex);
+    if (passive.length) {
+      CSS.highlights.set("exs-search", new Highlight(...passive));
+    }
+
+    if (activeSearchIndex >= 0 && searchRanges[activeSearchIndex]) {
+      CSS.highlights.set(
+        "exs-search-active",
+        new Highlight(searchRanges[activeSearchIndex])
+      );
+    }
+  }
+
+  function updateFindCount() {
+    findCount.textContent = searchRanges.length
+      ? `${activeSearchIndex + 1} / ${searchRanges.length}`
+      : "0 / 0";
+  }
+
+  function scrollActiveSearchMatch() {
+    const range = searchRanges[activeSearchIndex];
+    if (!range) return;
+
+    const node = range.startContainer;
+    const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    element?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+  }
+
+  function refreshSearchHighlights(scrollActive = false) {
+    const query = findInput.value;
+    const queryChanged = query !== lastSearchQuery;
+    lastSearchQuery = query;
+
+    searchRanges = collectSearchRanges(query);
+
+    if (!searchRanges.length) {
+      activeSearchIndex = -1;
+    } else if (queryChanged || activeSearchIndex < 0) {
+      activeSearchIndex = 0;
+    } else {
+      activeSearchIndex = Math.min(activeSearchIndex, searchRanges.length - 1);
+    }
+
+    renderSearchHighlights();
+    updateFindCount();
+
+    if (scrollActive && activeSearchIndex >= 0) scrollActiveSearchMatch();
+  }
+
+  function scheduleSearchRefresh(delay = 70) {
+    clearTimeout(searchRefreshTimer);
+    searchRefreshTimer = setTimeout(() => {
+      if (!findPopover.hidden) refreshSearchHighlights(false);
+    }, delay);
+  }
+
+  function navigateSearch(direction) {
+    if (!searchRanges.length) return;
+
+    activeSearchIndex =
+      (activeSearchIndex + direction + searchRanges.length) % searchRanges.length;
+
+    renderSearchHighlights();
+    updateFindCount();
+    scrollActiveSearchMatch();
+  }
+
+  function positionFindPopover() {
+    if (findPopover.hidden) return;
+
+    const button = $("#findButton");
+    const rect = button.getBoundingClientRect();
+    const width = findPopover.offsetWidth || 430;
+    const left = Math.max(10, Math.min(rect.right - width, window.innerWidth - width - 10));
+
+    findPopover.style.top = `${rect.bottom + 6}px`;
+    findPopover.style.left = `${left}px`;
+  }
+
+  function openFindPopover() {
+    findPopover.hidden = false;
+    $("#findButton").setAttribute("aria-expanded", "true");
+
+    requestAnimationFrame(() => {
+      positionFindPopover();
+      findInput.focus();
+      findInput.select();
+      refreshSearchHighlights(false);
+    });
+  }
+
+  function closeFindPopover() {
+    findPopover.hidden = true;
+    $("#findButton").setAttribute("aria-expanded", "false");
+    clearSearchHighlights();
+  }
+
+  function toggleFindPopover() {
+    if (findPopover.hidden) openFindPopover();
+    else closeFindPopover();
+  }
+
+  function replaceActiveSearchMatch() {
+    const range = searchRanges[activeSearchIndex];
+    if (!range) return false;
+
+    const replacement = $("#replaceInput").value;
     range.deleteContents();
     range.insertNode(document.createTextNode(replacement));
+
     markDirty();
-    updateStats();
+    normalizeDocument();
+    refreshSearchHighlights(true);
     return true;
   }
 
-  function replaceAll(find, replacement) {
-    if (!find) return 0;
-    let count = 0;
-    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
-    const textNodes = [];
-    while (walker.nextNode()) textNodes.push(walker.currentNode);
+  function replaceAllSearchMatches() {
+    if (!searchRanges.length) return 0;
 
-    textNodes.forEach((node) => {
-      if (node.parentElement?.closest("math-field")) return;
-      const original = node.nodeValue || "";
-      const parts = original.split(find);
-      if (parts.length > 1) {
-        count += parts.length - 1;
-        node.nodeValue = parts.join(replacement);
-      }
-    });
+    const replacement = $("#replaceInput").value;
+    const count = searchRanges.length;
 
-    if (count) {
-      markDirty();
-      updateStats();
-      updateOutline();
+    for (let index = searchRanges.length - 1; index >= 0; index -= 1) {
+      const range = searchRanges[index];
+      range.deleteContents();
+      range.insertNode(document.createTextNode(replacement));
     }
+
+    markDirty();
+    normalizeDocument();
+    refreshSearchHighlights(false);
     return count;
   }
 
