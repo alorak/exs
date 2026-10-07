@@ -1148,6 +1148,7 @@ ${body}
   editor.addEventListener("input", () => {
     saveSelection();
     scheduleDocumentRefresh();
+    scheduleSearchRefresh();
     markDirty();
   });
 
@@ -1330,12 +1331,35 @@ ${body}
 
   $("#saveButton").addEventListener("click", exportProject);
 
+  const closeNewDocumentDialog = () => {
+    if (newDocumentDialog.open) newDocumentDialog.close();
+  };
+
   $("#newButton").addEventListener("click", () => {
-    if (!confirm("Yeni belge oluşturulsun mu? Mevcut belgeniz tarayıcıda otomatik kaydedilmiş olsa da çalışma alanı sıfırlanır.")) return;
+    newDocumentDialog.showModal();
+  });
+
+  $("#newDocumentCloseButton").addEventListener("click", closeNewDocumentDialog);
+  $("#newDocumentCancelButton").addEventListener("click", closeNewDocumentDialog);
+
+  newDocumentDialog.addEventListener("click", (event) => {
+    if (event.target === newDocumentDialog) closeNewDocumentDialog();
+  });
+
+  $("#newDocumentConfirmButton").addEventListener("click", () => {
     titleInput.value = "Adsız bilimsel belge";
     editor.innerHTML = "<h1>Bilimsel Belge</h1><p><br></p>";
+    closeFindPopover();
+    findInput.value = "";
+    $("#replaceInput").value = "";
+    lastSearchQuery = "";
+    searchRanges = [];
+    activeSearchIndex = -1;
+    updateFindCount();
     normalizeDocument();
     saveLocal();
+    closeNewDocumentDialog();
+    editor.focus();
   });
 
   $("#openButton").addEventListener("click", () => openInput.click());
@@ -1374,39 +1398,49 @@ ${body}
     if (!event.target.closest(".export-menu")) $("#exportPopover").hidden = true;
   });
 
-  $("#findButton").addEventListener("click", () => {
-    saveSelection();
-    findDialog.showModal();
-    setTimeout(() => $("#findInput").focus(), 20);
+  $("#findButton").addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleFindPopover();
   });
 
-  $("#findForm").addEventListener("submit", (event) => event.preventDefault());
-
-  const closeFindDialog = () => {
-    if (findDialog.open) findDialog.close();
-  };
-
-  $("#findCloseButton").addEventListener("click", closeFindDialog);
-
-  findDialog.addEventListener("click", (event) => {
-    if (event.target === findDialog) closeFindDialog();
-  });
-  $("#findNextButton").addEventListener("click", (event) => {
-    event.preventDefault();
-    if (!findText($("#findInput").value)) showToast("Başka eşleşme bulunamadı.");
+  findPopover.addEventListener("click", (event) => {
+    event.stopPropagation();
   });
 
-  $("#replaceButton").addEventListener("click", (event) => {
-    event.preventDefault();
-    const ok = replaceCurrent($("#findInput").value, $("#replaceInput").value);
+  findInput.addEventListener("input", () => {
+    refreshSearchHighlights(true);
+  });
+
+  findInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      navigateSearch(event.shiftKey ? -1 : 1);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      closeFindPopover();
+      $("#findButton").focus();
+    }
+  });
+
+  $("#findPrevButton").addEventListener("click", () => navigateSearch(-1));
+  $("#findNextButton").addEventListener("click", () => navigateSearch(1));
+  $("#findCloseButton").addEventListener("click", closeFindPopover);
+
+  $("#replaceButton").addEventListener("click", () => {
+    const ok = replaceActiveSearchMatch();
     showToast(ok ? "Eşleşme değiştirildi." : "Eşleşme bulunamadı.");
   });
 
-  $("#replaceAllButton").addEventListener("click", (event) => {
-    event.preventDefault();
-    const count = replaceAll($("#findInput").value, $("#replaceInput").value);
+  $("#replaceAllButton").addEventListener("click", () => {
+    const count = replaceAllSearchMatches();
     showToast(`${count} eşleşme değiştirildi.`);
   });
+
+  document.addEventListener("click", () => {
+    if (!findPopover.hidden) closeFindPopover();
+  });
+
+  window.addEventListener("resize", positionFindPopover);
 
   $$(".tab-button").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1424,9 +1458,7 @@ ${body}
     }
     if (modifier && event.key.toLowerCase() === "f") {
       event.preventDefault();
-      saveSelection();
-      findDialog.showModal();
-      setTimeout(() => $("#findInput").focus(), 20);
+      openFindPopover();
     }
     if (modifier && event.shiftKey && event.key.toLowerCase() === "m") {
       event.preventDefault();
