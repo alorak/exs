@@ -1,0 +1,12 @@
+{
+  "name": "exs-scientific-editor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline-capable scientific WYSIWYG editor",
+  "scripts": {
+    "build": "node scripts/build-offline.mjs"
+  },
+  "dependencies": {
+    "mathlive": "0.111.0"
+  }
+}
