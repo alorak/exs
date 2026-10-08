@@ -518,6 +518,19 @@
     return field.textContent || "";
   }
 
+  function getMathMlValue(field) {
+    if (!field) return "";
+    if (typeof field.getValue === "function") {
+      try {
+        const mathml = field.getValue("math-ml");
+        if (typeof mathml === "string" && mathml.includes("<math")) return mathml;
+      } catch {
+        // Fall back to a plain LaTeX representation below.
+      }
+    }
+    return `<span class="latex-fallback">${escapeHtml(getMathValue(field))}</span>`;
+  }
+
   function setMathValue(field, latex) {
     if (!field) return;
     if ("value" in field) field.value = latex;
@@ -1462,23 +1475,32 @@
   }
 
   function exportHtml() {
+    const clone = editor.cloneNode(true);
+
+    clone.querySelectorAll("math-field").forEach((field) => {
+      const replacement = document.createElement("span");
+      replacement.className = "export-math";
+      replacement.innerHTML = getMathMlValue(field);
+      field.replaceWith(replacement);
+    });
+
     const html = `<!doctype html>
 <html lang="tr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapeHtml(titleInput.value)}</title>
-<script defer src="https://cdn.jsdelivr.net/npm/mathlive"><\/script>
 <style>
 body{max-width:800px;margin:40px auto;padding:0 24px;font:16px/1.6 "Times New Roman",serif;color:#111}
 h1,h2,h3{font-family:Arial,sans-serif}.display-equation{display:grid;grid-template-columns:1fr auto;align-items:center}
-.equation-center{display:flex;justify-content:center}math-field{border:0;background:transparent}
+.equation-center{display:flex;justify-content:center}.export-math{display:inline-block}
+.latex-fallback{font-family:"Times New Roman",serif;font-style:italic}
 table{width:100%;border-collapse:collapse}th,td{border:1px solid #333;padding:6px}img{max-width:100%}
 </style>
 </head>
 <body>
 <h1>${escapeHtml(titleInput.value)}</h1>
-${editor.innerHTML}
+${clone.innerHTML}
 </body></html>`;
     download(`${safeBaseName()}.html`, html, "text/html;charset=utf-8");
   }
@@ -2261,5 +2283,11 @@ ${body}
     normalizeDocument();
     hideMathVirtualKeyboard();
     saveLocal();
+
+    if ("serviceWorker" in navigator && location.protocol !== "file:") {
+      navigator.serviceWorker.register("./sw.js").catch(() => {
+        // The editor still works without SW when served from a local dev server.
+      });
+    }
   });
 })();
