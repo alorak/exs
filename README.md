@@ -22,18 +22,35 @@ EXS, bilimsel ve teknik belgeleri doğrudan tarayıcıda hazırlamak için geli�
 - Tarayıcı yazdırma altyapısı üzerinden PDF çıktısı
 - Mobil/dar ekran için temel responsive düzen
 - GitHub Pages üzerinde statik çalışma
+- MathLive JS/font/ses varlıkları dahil tamamen yerel runtime
+- Service worker ile uygulama kabuğu ve tüm bilimsel editör asset'lerini offline cache
 
 ## Kullanım
 
-Bu sürüm build adımı gerektirmez. Depoyu herhangi bir statik HTTP sunucusuyla açabilirsiniz:
+### GitHub Pages
+
+Deploy edilen site runtime sırasında **hiçbir CDN veya üçüncü taraf asset çağrısı yapmaz**. MathLive `0.111.0`, fontları ve gerekli yerel dosyaları Pages build'i sırasında `_site` içine kopyalanır.
+
+Service worker uygulamanın bütün statik dosyalarını precache eder. Site bir kez başarıyla yüklendikten sonra tarayıcı ağ bağlantısı olmadan da açılabilir ve düzenleme/kaydetme özellikleri çalışır.
+
+### Yerelde self-contained build
+
+İlk kez bağımlılıkları kurup site paketini üretin:
 
 ```bash
-python3 -m http.server 8080
+npm install
+npm run build
 ```
 
-Ardından `http://localhost:8080` adresine gidin.
+Sonra oluşan `_site/` dizinini herhangi bir yerel HTTP sunucusuyla açabilirsiniz:
 
-> Matematik editörü MathLive'ı CDN üzerinden yükler. Matematik alanlarının ilk yüklenmesi için internet bağlantısı gerekir.
+```bash
+python3 -m http.server 8080 --directory _site
+```
+
+Ardından `http://localhost:8080` adresine gidin. Bu aşamadan sonra uygulamanın çalışması için internet gerekmez.
+
+> `file://` ile doğrudan çift tıklamak yerine yerel HTTP sunucusu önerilir; service worker ve bazı tarayıcı güvenlik özellikleri `file://` altında çalışmaz.
 
 ## Kısayollar
 
@@ -52,7 +69,6 @@ Ardından `http://localhost:8080` adresine gidin.
   "format": "exs-scientific-document",
   "version": 1,
   "title": "Belge adı",
-  "author": "Yazar",
   "updatedAt": "ISO-8601",
   "body": "<p>...</p>"
 }
@@ -72,8 +88,8 @@ Ardından `http://localhost:8080` adresine gidin.
 6. MathML ve Typst dışa aktarma,
 7. LaTeX içe aktarma,
 8. sürüm geçmişi / IndexedDB tabanlı yerel belge kütüphanesi,
-9. çevrimdışı PWA ve MathLive varlıklarının yerel paketlenmesi,
-10. bilimsel şablonlar (makale, tez, rapor, ders notu).
+9. bilimsel şablonlar (makale, tez, rapor, ders notu),
+10. daha gelişmiş yerel belge/sürüm yönetimi.
 
 ## Lisans ve marka notu
 
