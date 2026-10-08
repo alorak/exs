@@ -1,0 +1,18 @@
+{
+  "name": "EXS Scientific Editor",
+  "short_name": "EXS",
+  "description": "Offline scientific WYSIWYG document and mathematics editor",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef2f6",
+  "theme_color": "#125ea9",
+  "icons": [
+    {
+      "src": "./icons/exs.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
