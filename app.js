@@ -61,6 +61,8 @@
     ["↔", "\\leftrightarrow"], ["ℏ", "\\hbar"], ["ℝ", "\\mathbb{R}"], ["ℂ", "\\mathbb{C}"]
   ];
 
+  const latexTextSymbols = new Map([...greekSymbols, ...scienceSymbols]);
+
   function initialDocument() {
     return `
       <h1>Bilimsel Belge</h1>
@@ -1602,7 +1604,10 @@ ${body}
       "{": "\\{", "}": "\\}", "$": "\\$", "&": "\\&", "#": "\\#",
       "%": "\\%", "_": "\\_", "^": "\\textasciicircum{}", "~": "\\textasciitilde{}"
     };
-    return String(value).replace(/[\\{}$&#%_^~]/g, (char) => map[char] || char);
+    return Array.from(String(value), (char) => {
+      const symbolLatex = latexTextSymbols.get(char);
+      return symbolLatex ? "$" + symbolLatex + "$" : (map[char] || char);
+    }).join("");
   }
 
   function escapeLatexUrl(value) {
@@ -1622,6 +1627,26 @@ ${body}
       .replace(/'/g, "&#039;");
   }
 
+  function insertPaletteSymbol(symbol, latex) {
+    // Insert standalone symbols as rendered Unicode in ordinary prose.
+    // Inside an active MathLive field, retain LaTeX editing semantics.
+    if (getMathTarget()) {
+      insertLatex(latex);
+      return;
+    }
+
+    restoreSelection();
+    if (!document.execCommand("insertText", false, symbol)) {
+      insertNodeAtSelection(document.createTextNode(symbol));
+      return;
+    }
+
+    saveSelection();
+    scheduleDocumentRefresh();
+    scheduleSearchRefresh();
+    markDirty();
+  }
+
   function populatePalette(element, values) {
     values.forEach(([symbol, latex]) => {
       const button = document.createElement("button");
@@ -1629,7 +1654,7 @@ ${body}
       button.textContent = symbol;
       button.title = latex;
       button.addEventListener("mousedown", (event) => event.preventDefault());
-      button.addEventListener("click", () => insertLatex(latex));
+      button.addEventListener("click", () => insertPaletteSymbol(symbol, latex));
       element.append(button);
     });
   }
