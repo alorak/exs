@@ -32,6 +32,7 @@
   let equationMode = "display";
   let editingEquation = null;
   let activeMathField = null;
+  let lastEditorContext = "text";
   let activeMathSelection = null;
   let activeMathPosition = null;
   let saveTimer = null;
@@ -227,6 +228,7 @@
   function rememberMathContext(field) {
     if (!field || !field.isConnected) return;
     activeMathField = field;
+    lastEditorContext = "math";
 
     try {
       activeMathSelection = cloneMathSelection(field.selection);
@@ -242,6 +244,7 @@
   }
 
   function clearMathContext() {
+    lastEditorContext = "text";
     activeMathField = null;
     activeMathSelection = null;
     activeMathPosition = null;
@@ -261,6 +264,10 @@
 
   function getMathTarget() {
     if (equationDialog.open) return equationEditor;
+
+    // A recent text placement is authoritative even if MathLive has left
+    // a previously active field as document.activeElement.
+    if (lastEditorContext === "text") return null;
 
     const focused = document.activeElement;
 
@@ -540,6 +547,15 @@
   }
 
   function saveSelection() {
+    // MathLive may leave the document Selection on an older prose position.
+    // Never save that stale range while the actual math field is active.
+    const focused = document.activeElement;
+    if (
+      lastEditorContext === "math" &&
+      focused?.tagName === "MATH-FIELD" &&
+      editor.contains(focused)
+    ) return;
+
     const selection = window.getSelection();
     if (!selection || !selection.rangeCount) return;
 
@@ -560,10 +576,15 @@
     const selection = window.getSelection();
     if (!selection) return;
     selection.removeAllRanges();
-    if (savedRange) {
-      selection.addRange(savedRange);
+    if (
+      savedRange &&
+      editor.contains(savedRange.startContainer) &&
+      editor.contains(savedRange.endContainer)
+    ) {
+      selection.addRange(savedRange.cloneRange());
       return;
     }
+    savedRange = null;
     const range = document.createRange();
     range.selectNodeContents(editor);
     range.collapse(false);
@@ -1635,16 +1656,11 @@ ${body}
       return;
     }
 
-    restoreSelection();
-    if (!document.execCommand("insertText", false, symbol)) {
-      insertNodeAtSelection(document.createTextNode(symbol));
-      return;
-    }
-
-    saveSelection();
-    scheduleDocumentRefresh();
+    // Use an explicit DOM Range: native insertText can shift the caret into
+    // an older MathLive field when a contenteditable document embeds one.
+    // insertNodeAtSelection collapses the caret immediately after this glyph.
+    insertNodeAtSelection(document.createTextNode(symbol));
     scheduleSearchRefresh();
-    markDirty();
   }
 
   function populatePalette(element, values) {
@@ -1884,6 +1900,17 @@ ${body}
     scheduleDocumentRefresh();
     scheduleSearchRefresh();
     markDirty();
+  });
+
+  editor.addEventListener("focusin", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target?.closest("math-field")) clearMathContext();
+  });
+
+  // Mouse and keyboard caret moves may not fire an input event. Persist the
+  // latest real prose selection before the symbol palette is used.
+  document.addEventListener("selectionchange", () => {
+    if (document.activeElement === editor) saveSelection();
   });
 
   editor.addEventListener("keyup", saveSelection);
